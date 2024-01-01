@@ -65,15 +65,19 @@ def dpll(formula, model=[]):
     if any(len(clause) == 0 for clause in formula): # Unsatisfiable as there is an empty clause
         return False
     literal = select_literal(formula, method="first")
-    # Add literal as a unit clause
-    if dpll(formula+[[literal]], model[:]):
-        return True, model
-    elif dpll(formula+[[-literal]], model[:]):
-        return True, model
+    # Try assigning the literal to True
+    new_model = model[:]
+    if dpll(formula + [[literal]], new_model):
+        return True, new_model
+
+    # Try assigning the literal to False
+    new_model = model[:]
+    if dpll(formula + [[-literal]], new_model):
+        return True, new_model
     return False
 
 if __name__ == "__main__":
-    file_path = './test_example.txt'
+    file_path = './input1.cnf'
     num_vars, num_clauses, clauses = read_dimacs_cnf(file_path)
     print("Number of Variables:", num_vars)
     print("Number of Clauses:", num_clauses)
