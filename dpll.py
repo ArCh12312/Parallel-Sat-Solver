@@ -41,14 +41,17 @@ def unit_propagate(formula, model):
     return formula, model
 
 def pure_literal_elimination(formula, model):
-    literals = {literal for clause in formula for literal in clause}
-    pure_literals = {literal for literal in literals if -literal not in literals}
-    # Add pure literals to the model, ensuring no duplicates
-    for literal in pure_literals:
-        if literal not in model:
-            model.append(literal)
-    new_formula = [clause for clause in formula if not any(literal in clause for literal in pure_literals)]
-    return new_formula, model
+    while True:
+        literals = {literal for clause in formula for literal in clause} # Collect all literals from the formula
+        pure_literals = {literal for literal in literals if -literal not in literals} # Identify pure literals
+        if not pure_literals:
+            break
+        for literal in pure_literals: # Add pure literals to the model if not already present
+            if literal not in model:
+                model.append(literal)
+        # Eliminate clauses containing pure literals
+        formula = [clause for clause in formula if not any(literal in clause for literal in pure_literals)]
+    return formula, model
 
 def select_literal(formula, method="first"):
     if method == "first":
