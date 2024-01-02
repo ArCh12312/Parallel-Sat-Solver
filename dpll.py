@@ -72,7 +72,6 @@ def dpll(formula, model=[]):
     new_model = model[:]
     if dpll(formula + [[literal]], new_model):
         return True, new_model
-
     # Try assigning the literal to False
     new_model = model[:]
     if dpll(formula + [[-literal]], new_model):
