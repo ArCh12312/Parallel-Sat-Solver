@@ -94,16 +94,3 @@ if __name__ == "__main__":
     _, _, clauses = read_dimacs_cnf(file_path)
     sat, model = dpll(clauses)
     print(sat, model)
-
-# if __name__ == "__main__":
-#     file_path = './input1.cnf'
-#     num_vars, num_clauses, clauses = read_dimacs_cnf(file_path)
-#     print("Number of Variables:", num_vars)
-#     print("Number of Clauses:", num_clauses)
-#     print("Clauses:", clauses)
-
-#     sat, model = dpll(clauses)
-#     if sat:
-#         print("Satisfiable", model)
-#     else:
-#         print("Unsatisfiable")
