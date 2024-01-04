@@ -1,9 +1,12 @@
+import random
+
 class DPLLSolver:
-    def __init__(self, file_path):
+    def __init__(self, file_path, method="first"):
         self.file_path = file_path
         self.clauses = []
         self.num_vars = 0
         self.num_clauses = 0
+        self.method = method
         self.read_dimacs_cnf()
 
     def read_dimacs_cnf(self):
@@ -52,10 +55,12 @@ class DPLLSolver:
             formula = [clause for clause in formula if not any(literal in clause for literal in pure_literals)]
         return formula, model
 
-    @staticmethod
-    def select_literal(formula, method="first"):
-        if method == "first":
+    def select_literal(self, formula):
+        if self.method == "first":
             return formula[0][0]
+        elif self.method == "random":
+            literals = {literal for clause in formula for literal in clause}
+            return random.choice(list(literals))
 
     def dpll(self, formula, model=[]):
         formula, model = DPLLSolver.unit_propagate(formula, model)
@@ -64,7 +69,7 @@ class DPLLSolver:
             return True, model
         if any(len(clause) == 0 for clause in formula):
             return False, []
-        literal = DPLLSolver.select_literal(formula)
+        literal = self.select_literal(formula)
         new_model = model[:]
         sat, updated_model = self.dpll(formula + [[literal]], new_model)
         if sat:
