@@ -37,7 +37,7 @@ def unit_propagate(formula, model):
         unit_clause = unit_clause[0]  # Get the literal in the unit clause
         formula = [clause for clause in formula if unit_clause not in clause]
         formula = [[lit for lit in clause if lit != -unit_clause] for clause in formula]
-        print("unit_propagation_______________________________________________________________________")
+        
         if unit_clause not in model:
             model.append(unit_clause)
     return formula, model
@@ -48,7 +48,6 @@ def pure_literal_elimination(formula, model):
         pure_literals = {literal for literal in literals if -literal not in literals} # Identify pure literals
         if not pure_literals:
             break
-        print("eliminating pure literals____________________________________________________________________________________________")
         for literal in pure_literals: # Add pure literals to the model if not already present
             if literal not in model:
                 model.append(literal)
@@ -61,7 +60,6 @@ def select_literal(formula, method="first"):
         return formula[0][0]
 
 def dpll(formula, model=[]):
-    print(formula)
     # Find a unit clause and propagate it
     formula, model = unit_propagate(formula, model)
     # Pure literal elimination
