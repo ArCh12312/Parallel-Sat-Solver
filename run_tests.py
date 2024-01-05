@@ -1,5 +1,6 @@
 import os
 import subprocess
+import time
 
 def run_dpll_on_file(dpll_script, cnf_file):
     try:
@@ -25,5 +26,8 @@ sat_folder = 'tests/uf20-91'
 sat_output_file = 'sat_results.txt'
 # unsat_output_file = 'unsat_results.txt'
 
+start_time = time.time()
 process_folder(sat_folder, dpll_script, sat_output_file)
+end_time = time.time()
+print(end_time-start_time)
 # process_folder(unsat_folder, dpll_script, unsat_output_file)
