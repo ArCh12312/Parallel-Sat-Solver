@@ -55,12 +55,34 @@ class DPLLSolver:
             formula = [clause for clause in formula if not any(literal in clause for literal in pure_literals)]
         return formula, model
 
+    def literal_frequency(self, formula):
+        frequency = {}
+        for clause in formula:
+            for literal in clause:
+                if literal in frequency:
+                    frequency[literal] += 1
+                else:
+                    frequency[literal] = 1
+        return frequency
+
     def select_literal(self, formula):
         if self.method == "first":
             return formula[0][0]
         elif self.method == "random":
             literals = {literal for clause in formula for literal in clause}
             return random.choice(list(literals))
+        elif self.method == "mfv":
+            frequency = self.literal_frequency(formula)
+            return max(frequency, key=frequency.get)
+        elif self.method == "moms":
+            min_clause_size = min(len(clause) for clause in formula)
+            min_clauses = [clause for clause in formula if len(clause) == min_clause_size]
+            frequency = self.literal_frequency(min_clauses)
+            return max(frequency, key=frequency.get)
+        elif self.method == "jw":
+            frequency = self.literal_frequency(formula)
+            jw_scores = {literal: 2**-len(clause) for clause in formula for literal in clause}
+            return max(jw_scores, key=jw_scores.get)
 
     def dpll(self, formula, model=[]):
         formula, model = DPLLSolver.unit_propagate(formula, model)
@@ -85,11 +107,12 @@ class DPLLSolver:
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) != 2:
-        print("Usage: python dpll.py <file_path>")
+    if len(sys.argv) < 2 or len(sys.argv) > 3:
+        print("Usage: python dpll.py <file_path> [method]")
         sys.exit(1)
 
     file_path = sys.argv[1]
-    solver = DPLLSolver(file_path)
+    method = sys.argv[2] if len(sys.argv) == 3 else "first"  # Default to "first" if not specified
+    solver = DPLLSolver(file_path, method)
     sat, model = solver.solve()
     print(sat, model)
