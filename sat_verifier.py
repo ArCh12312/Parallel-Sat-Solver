@@ -44,8 +44,8 @@ if __name__ == "__main__":
         print("Usage: python sat_verifier.py <input_file_path> <output_file_path>")
         sys.exit(1)
 
-    file_path = './tests/sat_test.cnf'
-    assignment_file_path = "dpll_output.txt"
+    file_path = sys.argv[1]
+    assignment_file_path = sys.argv[2]
     clauses = parse_dimacs_cnf(file_path)
     assignment_str = read_assignment_from_file(assignment_file_path)
     assignment = parse_assignment(assignment_str)
