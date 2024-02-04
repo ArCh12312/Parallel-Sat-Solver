@@ -3,6 +3,7 @@
 #include <sstream>
 #include <vector>
 #include <string>
+#include <stack>
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
@@ -15,7 +16,7 @@ public:
         : file_path(file_path), method(method) {
         readDimacsCnf();
         initializeLiteralFrequency();
-        frequency_stack.push_back(frequency);
+        frequency_stack.push(frequency);
     }
 
     std::pair<bool, std::vector<int>> solve();
@@ -27,12 +28,10 @@ private:
     int num_clauses;
     std::string method;
     std::unordered_map<int, int> frequency;
-    std::vector<std::unordered_map<int, int>> frequency_stack;
+    std::stack<std::unordered_map<int, int>> frequency_stack;
 
     void readDimacsCnf();
     void initializeLiteralFrequency();
-    void pushFrequencyState();
-    void popFrequencyState();
     void updateFrequency(const std::vector<int>& clause);
     static std::vector<int> findUnitClause(const std::vector<std::vector<int>>& formula);
     std::pair<bool, std::vector<int>> unitPropagate(std::vector<std::vector<int>>& formula, std::vector<int>& model);
@@ -68,22 +67,11 @@ void DPLLSolver::initializeLiteralFrequency() {
     }
 }
 
-void DPLLSolver::pushFrequencyState() {
-    frequency_stack.push_back(frequency);
-}
-
-void DPLLSolver::popFrequencyState() {
-    if (!frequency_stack.empty()) {
-        frequency = frequency_stack.back();
-        frequency_stack.pop_back();
-    }
-}
-
 void DPLLSolver::updateFrequency(const std::vector<int>& clause) {
     for (int lit : clause) {
         if (frequency.find(lit) != frequency.end()) {
             frequency[lit]--;
-            if (frequency[lit] == 0) {
+            if (frequency[lit] == 0) { // Can be written as if (frequency[lit--] == 0)
                 frequency.erase(lit);
             }
         }
@@ -167,7 +155,7 @@ std::pair<bool, std::vector<int>> DPLLSolver::dpll(std::vector<std::vector<int>>
     if (std::any_of(formula.begin(), formula.end(), [](const std::vector<int>& clause) { return clause.empty(); })) {
         return {false, std::vector<int>()};
     }
-    pushFrequencyState();
+    frequency_stack.push(frequency);
     int literal = selectLiteral(formula);
     std::vector<int> new_model = model;
     new_model.push_back(literal);
@@ -177,8 +165,9 @@ std::pair<bool, std::vector<int>> DPLLSolver::dpll(std::vector<std::vector<int>>
     if (satModel.first) {
         return satModel;
     }
-    popFrequencyState();
-    pushFrequencyState();
+    frequency = frequency_stack.top();
+    frequency_stack.pop();
+    frequency_stack.push(frequency);
     new_model = model;
     new_model.push_back(-literal);
     formula_with_literal = formula;
@@ -187,7 +176,8 @@ std::pair<bool, std::vector<int>> DPLLSolver::dpll(std::vector<std::vector<int>>
     if (satModel.first) {
         return satModel;
     }
-    popFrequencyState();
+    frequency = frequency_stack.top();
+    frequency_stack.pop();
     return {false, std::vector<int>()};
 }
 
