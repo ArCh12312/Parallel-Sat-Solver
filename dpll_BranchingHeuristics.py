@@ -8,6 +8,8 @@ class DPLLSolver:
         self.num_clauses = 0
         self.method = method
         self.frequency = {}
+        self.model = []
+        self.model_stack = []
         self.read_dimacs_cnf()
         self.intialize_literal_frequency()
         self.frequency_stack = [self.frequency]
@@ -33,6 +35,13 @@ class DPLLSolver:
                 else:
                     self.frequency[literal] = 1
 
+    def push_model_state(self):
+        self.model_stack.append(self.model.copy())
+
+    def pop_model_state(self):
+        if self.model_stack:
+            self.model = self.model_stack.pop()
+    
     def push_frequency_state(self):
         self.frequency_stack.append(self.frequency.copy())
 
@@ -54,7 +63,7 @@ class DPLLSolver:
                 return clause
         return None
 
-    def unit_propagate(self, formula, model):
+    def unit_propagate(self, formula):
         while True:
             unit_clause = DPLLSolver.find_unit_clause(formula)
             if not unit_clause:
@@ -69,9 +78,9 @@ class DPLLSolver:
             formula = [[lit for lit in clause if lit != -unit_clause] for clause in new_formula]
             if -unit_clause in self.frequency:
                 del self.frequency[-unit_clause]
-            if unit_clause not in model:
-                model.append(unit_clause)
-        return formula, model
+            if unit_clause not in self.model:
+                self.model.append(unit_clause)
+        return formula
 
     # @staticmethod
     # def pure_literal_elimination(formula, model):
@@ -106,24 +115,26 @@ class DPLLSolver:
             jw_scores = {literal: 2**-len(clause) for clause in formula for literal in clause}
             return max(jw_scores, key=jw_scores.get)
 
-    def dpll(self, formula, model=[]):
-        formula, model = self.unit_propagate(formula, model)
+    def dpll(self, formula):
+        formula = self.unit_propagate(formula)
         if not formula:
-            return True, model
+            return True, self.model
         if any(len(clause) == 0 for clause in formula):
             return False, []
         self.push_frequency_state()  # Push state before making a decision
+        self.push_model_state()
         literal = self.select_literal(formula)
-        new_model = model[:]
-        sat, updated_model = self.dpll(formula + [[literal]], new_model)
+        sat = self.dpll(formula + [[literal]])
         if sat:
-            return True, updated_model
+            return True, self.model
+        self.pop_model_state()
         self.pop_frequency_state()  # Pop state when backtracking
+        self.push_model_state()
         self.push_frequency_state()  # Push again for the opposite decision
-        new_model = model[:]
-        sat, updated_model = self.dpll(formula + [[-literal]], new_model)
+        sat = self.dpll(formula + [[-literal]])
         if sat:
-            return True, updated_model
+            return True, self.model
+        self.pop_model_state()
         self.pop_frequency_state()  # Pop again if this path also fails
         return False, []
 
