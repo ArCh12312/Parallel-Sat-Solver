@@ -22,7 +22,10 @@ public:
     std::stack<Model> model_stack;
 
     std::pair<bool, Model> solve(const std::string& filename) {
-        Formula formula = readDimacsCnf(filename);
+        auto [formula, success] = readDimacsCnf(filename);
+        if (!success) {
+            return {false, {}}; // Return false and an empty model if file reading failed
+        }
         model_stack.push({});
         bool isSatisfiable = DPLL(formula);
         return {isSatisfiable, model};
@@ -37,14 +40,14 @@ private:
         std::vector<Clause> clauses;
     };
 
-    Formula readDimacsCnf(const std::string& filename) {
+    std::pair<Formula, bool> readDimacsCnf(const std::string& filename) {
         std::ifstream file(filename);
         std::string line;
         Formula formula;
 
         if (!file.is_open()) {
             std::cerr << "Unable to open file." << std::endl;
-            return formula;
+            return {formula,false};
         }
 
         while (getline(file, line)) {
@@ -63,7 +66,7 @@ private:
         }
 
         file.close();
-        return formula;
+        return {formula,true};
     }
 
     Clause findUnitClause(const Formula& formula) {
@@ -154,23 +157,33 @@ private:
 };
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " [DIMACS file]" << std::endl;
+    // Command line argument handling
+    if (argc != 3 && argc != 4) {
+        std::cerr << "Usage: " << argv[0] << " <input_file_path> <output_file_path> [method]" << std::endl;
         return 1;
     }
 
+    std::string input_file_path = argv[1];
+    std::string output_file_path = argv[2];
+    std::string method = (argc == 4) ? argv[3] : "first";
+
     DPLL_Solver solver;
-    auto result = solver.solve(argv[1]);
-    if (result.first) {
-        std::cout << "SATISFIABLE" << std::endl;
-        std::cout << "Model: ";
-        for (const auto& lit : result.second.literals) {
-            std::cout << lit << " ";
-        }
-        std::cout << std::endl;
-    } else {
-        std::cout << "UNSATISFIABLE" << std::endl;
+    auto [isSatisfiable, model] = solver.solve(input_file_path);
+    
+    if (!isSatisfiable && model.literals.empty()) {
+        std::cerr << "Failed to process the input file." << std::endl;
+        return 1; // Exit if the file couldn't be processed
     }
+
+
+    std::ofstream output_file(output_file_path);
+    output_file << "Satisfiable: " << (isSatisfiable ? "true" : "false") << "\n";
+    output_file << "Model: ";
+    for (int val : model.literals) {
+        output_file << val << " ";
+    }
+    output_file << "\n";
+    std::cout << "Output written to " << output_file_path << std::endl;
 
     return 0;
 }
