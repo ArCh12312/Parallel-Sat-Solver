@@ -4,6 +4,8 @@ class DPLLSolver:
         self.clauses = []
         self.num_vars = 0
         self.num_clauses = 0
+        self.model = []
+        self.model_stack = []
         self.read_dimacs_cnf()
 
     def read_dimacs_cnf(self):
@@ -18,8 +20,14 @@ class DPLLSolver:
                     clause = [int(x) for x in line.split() if x != '0']
                     if clause:
                         self.clauses.append(clause)
+    
+    def push_model_state(self):
+        self.model_stack.append(self.model.copy())
 
-    @staticmethod
+    def pop_model_state(self):
+        if self.model_stack:
+            self.model = self.model_stack.pop()
+
     def find_unit_clause(formula):
         for clause in formula:
             if len(clause) == 1:
@@ -68,34 +76,38 @@ class DPLLSolver:
         if method == "first":
             return formula[0][0]
 
-    def dpll(self, formula, model=[]):
-        formula, model = DPLLSolver.unit_propagate(formula, model)
-        # formula, model = DPLLSolver.pure_literal_elimination(formula, model)
-        if not formula:
-            return True, model
-        if any(len(clause) == 0 for clause in formula):
-            return False, []
+    def dpll(self, formula):
+        formula = self.unit_propagate(formula)
+        if formula == []:
+            return True
+        if formula == -1:
+            return False
+        self.push_model_state()
         literal = DPLLSolver.select_literal(formula)
-        new_model = model[:]
-        sat, updated_model = self.dpll(formula + [[literal]], new_model)
+        sat = self.dpll(formula + [[literal]])
         if sat:
-            return True, updated_model
-        new_model = model[:]
-        sat, updated_model = self.dpll(formula + [[-literal]], new_model)
+            return True
+        self.pop_model_state()
+        self.push_model_state()
+        sat = self.dpll(formula + [[-literal]])
         if sat:
-            return True, updated_model
-        return False, []
+            return True
+        self.pop_model_state()
+        return False
 
     def solve(self):
-        return self.dpll(self.clauses)
+        if self.dpll(self.clauses):
+            return True, self.model
+        return False,[]
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) != 3:
-        print("Usage: python dpll.py <input_file_path> <output_file_path>")
+    if len(sys.argv) < 3 or len(sys.argv) > 4:
+        print("Usage: python dpll.py <input_file_path> <output_file_path> [method]")
         sys.exit(1)
 
     input_file_path = sys.argv[1]
+    method = sys.argv[3] if len(sys.argv) == 4 else "first"  # Default to "first" if not specified
     solver = DPLLSolver(input_file_path)
     sat, model = solver.solve()
     
