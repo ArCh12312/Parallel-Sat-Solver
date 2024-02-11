@@ -70,7 +70,7 @@ class DPLLSolver:
 
     def dpll(self, formula, model=[]):
         formula, model = DPLLSolver.unit_propagate(formula, model)
-        formula, model = DPLLSolver.pure_literal_elimination(formula, model)
+        # formula, model = DPLLSolver.pure_literal_elimination(formula, model)
         if not formula:
             return True, model
         if any(len(clause) == 0 for clause in formula):
