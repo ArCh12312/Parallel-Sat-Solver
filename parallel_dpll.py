@@ -2,6 +2,7 @@
 from multiprocessing import cpu_count
 from concurrent.futures import ThreadPoolExecutor
 import threading
+from queue import PriorityQueue
 import sys
 
 class DPLLSolver:
@@ -11,7 +12,7 @@ class DPLLSolver:
         self.num_vars = 0
         self.num_clauses = 0
         self.result = False
-        self.formula_stack = []
+        self.formula_queue = PriorityQueue()
         self.lock = threading.Lock()
         self.read_dimacs_cnf()
 
@@ -28,22 +29,43 @@ class DPLLSolver:
                     if clause:
                         self.clauses.append(clause)
 
-    @staticmethod
-    def find_unit_clause(formula):
-        for clause in formula:
-            if len(clause) == 1:
-                return clause
-        return None
+    # @staticmethod
+    # def find_unit_clause(formula):
+    #     for clause in formula:
+    #         if len(clause) == 1:
+    #             return clause
+    #     return None
 
+    # @staticmethod
+    # def unit_propagate(formula):
+    #     while True:
+    #         unit_clause = DPLLSolver.find_unit_clause(formula)
+    #         if not unit_clause:
+    #             break
+    #         unit_clause = unit_clause[0]
+    #         formula = [clause for clause in formula if unit_clause not in clause]
+    #         formula = [[lit for lit in clause if lit != -unit_clause] for clause in formula]
+    #     return formula
+                        
     @staticmethod
     def unit_propagate(formula):
-        while True:
-            unit_clause = DPLLSolver.find_unit_clause(formula)
-            if not unit_clause:
-                break
-            unit_clause = unit_clause[0]
-            formula = [clause for clause in formula if unit_clause not in clause]
-            formula = [[lit for lit in clause if lit != -unit_clause] for clause in formula]
+        unit_clauses = {clause[0] for clause in formula if len(clause) == 1}
+        while unit_clauses:
+            unit_clause = unit_clauses.pop()
+            new_formula = []
+            for clause in formula:
+                if unit_clause in clause:
+                    continue  # Remove the entire clause
+                if -unit_clause in clause:
+                    new_clause = [lit for lit in clause if lit != -unit_clause]
+                    if len(new_clause) == 0:
+                        return []  # Formula is unsatisfiable
+                    if len(new_clause) == 1:
+                        unit_clauses.add(new_clause[0])  # Found a new unit clause
+                    new_formula.append(new_clause)
+                else:
+                    new_formula.append(clause)
+            formula = new_formula
         return formula
 
     @staticmethod
@@ -56,25 +78,25 @@ class DPLLSolver:
         if not formula: 
             with self.lock:
                 self.result = True
-                quit()
+                return
         elif all(len(clause) != 0 for clause in formula):
             literal = self.select_literal(formula)
             with self.lock:
-                self.formula_stack.append(formula + [[literal]])
-                self.formula_stack.append(formula + [[-literal]])
+                self.formula_queue.put(len(formula)+1, formula + [[literal]])
+                self.formula_queue.put(len(formula)+1, formula + [[-literal]])
 
     def worker(self):
         while True:
             with self.lock:
-                if not self.formula_stack:
+                if not self.formula_queue:
                     break
-                formula = self.formula_stack.pop()
+                _, formula = self.formula_queue.get()
             self.dpll(formula)
             if self.result:
                 break
     
     def solve(self):
-        self.formula_stack.append(self.clauses)
+        self.formula_queue.put(len(self.clauses), self.clauses)
         with ThreadPoolExecutor(max_workers=cpu_count()) as executor:
             futures = [executor.submit(self.worker) for _ in range(cpu_count())]
 

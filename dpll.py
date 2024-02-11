@@ -26,31 +26,42 @@ class DPLLSolver:
                 return clause
         return None
 
-    @staticmethod
-    def unit_propagate(formula, model):
-        while True:
-            unit_clause = DPLLSolver.find_unit_clause(formula)
-            if not unit_clause:
-                break
-            unit_clause = unit_clause[0]
-            formula = [clause for clause in formula if unit_clause not in clause]
-            formula = [[lit for lit in clause if lit != -unit_clause] for clause in formula]
-            if unit_clause not in model:
-                model.append(unit_clause)
-        return formula, model
+    def unit_propagate(self, formula):
+        unit_clause = DPLLSolver.find_unit_clause(formula)
+        if unit_clause is None:
+            return formula
+        unit_clauses = [unit_clause[0]]
+        while unit_clauses:
+            unit_clause = unit_clauses.pop()
+            new_formula = []
+            if -unit_clause in self.model:
+                return -1
+            self.model.append(unit_clause)
+            for clause in formula:
+                if unit_clause in clause:
+                    continue  # Remove the entire clause
+                if -unit_clause in clause:
+                    clause = [lit for lit in clause if lit != -unit_clause]
+                if len(clause) == 0:
+                        return -1
+                if len(clause) == 1:
+                    unit_clauses.append(clause[0])  # Found a new unit clause
+                new_formula.append(clause)
+            formula = new_formula
+        return formula
 
-    @staticmethod
-    def pure_literal_elimination(formula, model):
-        while True:
-            literals = {literal for clause in formula for literal in clause}
-            pure_literals = {literal for literal in literals if -literal not in literals}
-            if not pure_literals:
-                break
-            for literal in pure_literals:
-                if literal not in model:
-                    model.append(literal)
-            formula = [clause for clause in formula if not any(literal in clause for literal in pure_literals)]
-        return formula, model
+    # @staticmethod
+    # def pure_literal_elimination(formula, model):
+    #     while True:
+    #         literals = {literal for clause in formula for literal in clause}
+    #         pure_literals = {literal for literal in literals if -literal not in literals}
+    #         if not pure_literals:
+    #             break
+    #         for literal in pure_literals:
+    #             if literal not in model:
+    #                 model.append(literal)
+    #         formula = [clause for clause in formula if not any(literal in clause for literal in pure_literals)]
+    #     return formula, model
 
     @staticmethod
     def select_literal(formula, method="first"):

@@ -62,24 +62,31 @@ class DPLLSolver:
             if len(clause) == 1:
                 return clause
         return None
-
+    
     def unit_propagate(self, formula):
-        while True:
-            unit_clause = DPLLSolver.find_unit_clause(formula)
-            if not unit_clause:
-                break
-            unit_clause = unit_clause[0]
+        unit_clause = DPLLSolver.find_unit_clause(formula)
+        if unit_clause is None:
+            return formula
+        unit_clauses = [unit_clause[0]]
+        while unit_clauses:
+            unit_clause = unit_clauses.pop()
             new_formula = []
+            if -unit_clause in self.model:
+                return -1
+            self.model.append(unit_clause)
             for clause in formula:
                 if unit_clause in clause:
                     self.update_frequency(clause)
-                else:
-                    new_formula.append(clause)
-            formula = [[lit for lit in clause if lit != -unit_clause] for clause in new_formula]
+                if -unit_clause in clause:
+                    clause = [lit for lit in clause if lit != -unit_clause]
+                if len(clause) == 0:
+                        return -1
+                if len(clause) == 1:
+                    unit_clauses.append(clause[0])  # Found a new unit clause
+                new_formula.append(clause)
             if -unit_clause in self.frequency:
                 del self.frequency[-unit_clause]
-            if unit_clause not in self.model:
-                self.model.append(unit_clause)
+            formula = new_formula
         return formula
 
     # @staticmethod
