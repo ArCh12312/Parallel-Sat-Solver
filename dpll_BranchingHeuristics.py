@@ -61,32 +61,30 @@ class DPLLSolver:
         for clause in formula:
             if len(clause) == 1:
                 return clause
-        return None
-    
+        return [0]
+
     def unit_propagate(self, formula):
         unit_clause = DPLLSolver.find_unit_clause(formula)
-        if unit_clause is None:
-            return formula
-        unit_clauses = [unit_clause[0]]
-        while unit_clauses:
-            unit_clause = unit_clauses.pop()
+        unit_clause = unit_clause[0]
+        while unit_clause != 0:
+            new_unit_clause = 0
             new_formula = []
-            if -unit_clause in self.model:
-                return -1
-            self.model.append(unit_clause)
             for clause in formula:
                 if unit_clause in clause:
                     self.update_frequency(clause)
-                if -unit_clause in clause:
+                else:
                     clause = [lit for lit in clause if lit != -unit_clause]
-                if len(clause) == 0:
+                    if clause == []:
                         return -1
-                if len(clause) == 1:
-                    unit_clauses.append(clause[0])  # Found a new unit clause
-                new_formula.append(clause)
+                    if len(clause) == 1:
+                        new_unit_clause = clause[0]
+                    new_formula.append(clause)
+            formula = new_formula
             if -unit_clause in self.frequency:
                 del self.frequency[-unit_clause]
-            formula = new_formula
+            if unit_clause not in self.model:
+                self.model.append(unit_clause)
+            unit_clause = new_unit_clause
         return formula
 
     # @staticmethod
@@ -124,21 +122,21 @@ class DPLLSolver:
 
     def dpll(self, formula):
         formula = self.unit_propagate(formula)
-        if not formula:
+        if formula == []:
             return True, self.model
-        if any(len(clause) == 0 for clause in formula):
+        if formula == -1:
             return False, []
         self.push_frequency_state()  # Push state before making a decision
         self.push_model_state()
         literal = self.select_literal(formula)
-        sat = self.dpll(formula + [[literal]])
+        sat, model = self.dpll(formula + [[literal]])
         if sat:
             return True, self.model
         self.pop_model_state()
         self.pop_frequency_state()  # Pop state when backtracking
         self.push_model_state()
         self.push_frequency_state()  # Push again for the opposite decision
-        sat = self.dpll(formula + [[-literal]])
+        sat, model = self.dpll(formula + [[-literal]])
         if sat:
             return True, self.model
         self.pop_model_state()
@@ -147,7 +145,7 @@ class DPLLSolver:
 
     def solve(self):
         return self.dpll(self.clauses)
-
+        
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 3 or len(sys.argv) > 4:
