@@ -31,31 +31,30 @@ class DPLLSolver:
     def find_unit_clause(formula):
         for clause in formula:
             if len(clause) == 1:
-                return clause
-        return None
+                return clause[0]
+        return 0
 
     def unit_propagate(self, formula):
         unit_clause = DPLLSolver.find_unit_clause(formula)
-        if unit_clause is None:
-            return formula
-        unit_clauses = [unit_clause[0]]
-        while unit_clauses:
-            unit_clause = unit_clauses.pop()
+        while unit_clause != 0:
+            new_unit_clause = 0
             new_formula = []
-            if -unit_clause in self.model:
-                return -1
-            self.model.append(unit_clause)
             for clause in formula:
                 if unit_clause in clause:
-                    continue  # Remove the entire clause
-                if -unit_clause in clause:
+                    continue
+                else:
                     clause = [lit for lit in clause if lit != -unit_clause]
-                if len(clause) == 0:
+                    if clause == []:
                         return -1
-                if len(clause) == 1:
-                    unit_clauses.append(clause[0])  # Found a new unit clause
-                new_formula.append(clause)
+                    if len(clause) == 1:
+                        new_unit_clause = clause[0]
+                    new_formula.append(clause)
             formula = new_formula
+            if -unit_clause in self.frequency:
+                del self.frequency[-unit_clause]
+            if unit_clause not in self.model:
+                self.model.append(unit_clause)
+            unit_clause = new_unit_clause
         return formula
 
     # @staticmethod
