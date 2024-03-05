@@ -1,4 +1,7 @@
 import random
+import sys
+import cProfile
+import pstats
 
 class DPLLSolver:
     def __init__(self, file_path, method="first"):
@@ -60,25 +63,25 @@ class DPLLSolver:
     def find_unit_clause(formula):
         for clause in formula:
             if len(clause) == 1:
-                return clause
-        return [0]
+                return clause[0]
+        return 0
 
     def unit_propagate(self, formula):
         unit_clause = DPLLSolver.find_unit_clause(formula)
-        unit_clause = unit_clause[0]
         while unit_clause != 0:
             new_unit_clause = 0
             new_formula = []
             for clause in formula:
                 if unit_clause in clause:
                     self.update_frequency(clause)
-                else:
+                    continue
+                elif -unit_clause in clause:
                     clause = [lit for lit in clause if lit != -unit_clause]
-                    if clause == []:
-                        return -1
-                    if len(clause) == 1:
-                        new_unit_clause = clause[0]
-                    new_formula.append(clause)
+                if clause == []:
+                    return -1
+                if len(clause) == 1:
+                    new_unit_clause = clause[0]
+                new_formula.append(clause)
             formula = new_formula
             if -unit_clause in self.frequency:
                 del self.frequency[-unit_clause]
@@ -146,8 +149,7 @@ class DPLLSolver:
     def solve(self):
         return self.dpll(self.clauses)
         
-if __name__ == "__main__":
-    import sys
+def main():
     if len(sys.argv) < 3 or len(sys.argv) > 4:
         print("Usage: python dpll.py <input_file_path> <output_file_path> [method]")
         sys.exit(1)
@@ -163,3 +165,14 @@ if __name__ == "__main__":
         file.write(f"Satisfiable: {sat}\n")
         file.write(f"Model: {model}\n")
     print(f"Output written to {output_file_path}")
+
+if __name__ == "__main__":
+    main()
+    # cProfile.run('main()', 'solver_profile_stats')
+
+    # # Create a Stats object based on the saved stats file
+    # p = pstats.Stats('solver_profile_stats')
+
+    # # Sort and print the stats
+    # # Sort by cumulative time spent in a function and print the top 10 functions
+    # p.sort_stats('cumulative').print_stats(10)
