@@ -77,7 +77,7 @@ class DPLLSolver:
                 else:
                     clause = [lit for lit in clause if lit != -unit_clause]
                     if clause == []:
-                        return -1
+                        return [[]]
                     if len(clause) == 1:
                         new_unit_clause = clause[0]
                     new_formula.append(clause)
@@ -140,7 +140,7 @@ class DPLLSolver:
                 elif -unit_clause in clause:
                     clause = [lit for lit in clause if lit != -unit_clause]
                 if clause == []:
-                    return -1, []
+                    return [[]], []
                 if len(clause) == 1:
                     new_unit_clause = clause[0]
                 new_formula.append(clause)
@@ -165,11 +165,11 @@ class DPLLSolver:
             model_neg = model[:]
             formula_pos, model_pos = self.unit_propagate_1(formula+[[literal]], model_pos)
             formula_neg, model_neg = self.unit_propagate_1(formula+[[-literal]], model_neg)
-            if formula_pos == -1 and formula_neg == -1:
+            if formula_pos == [[]] and formula_neg == [[]]:
                 return 0
-            elif formula_pos == -1:
+            elif formula_pos == [[]]:
                 return -literal
-            elif formula_neg == -1:
+            elif formula_neg == [[]]:
                 return literal
             elif formula_pos == []:
                 return literal
@@ -190,7 +190,7 @@ class DPLLSolver:
         formula = self.unit_propagate(formula)
         if formula == []:
             return True, self.model
-        if formula == -1:
+        if formula == [[]]:
             return False, []
         literals = self.select_literal(formula)
         literal = self.look_ahead(formula, literals, self.model)

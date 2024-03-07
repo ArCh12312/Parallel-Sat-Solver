@@ -20,7 +20,7 @@ def process_folder(folder_path, dpll_script, output_file):
                 result = run_dpll_on_file(dpll_script, file_path)
                 out_file.write(f'File: {filename}, Result: {result}')
 
-dpll_script = 'dpll.py'
+dpll_script = 'Look-Ahead_test_solver.py'
 sat_folder = 'tests/uf20-91'
 # unsat_folder = 'tests/unsat'
 sat_output_file = 'sat_results.txt'
