@@ -110,36 +110,47 @@ class Cube_and_Conquer_Solver:
     def compute_score(self, formula, subformula, model, new_model):
         return (len(formula)/len(subformula))*((len(new_model)+1)/(len(model)+1))
 
+    def look_ahead_helper(self, formula, literal, model):
+        model_pos = model[:]
+        model_neg = model[:]
+        formula_pos, model_pos = self.unit_propagate(formula+[[literal]], model_pos)
+        formula_neg, model_neg = self.unit_propagate(formula+[[-literal]], model_neg)
+        if formula_pos == [[]] and formula_neg == [[]]:
+            return float('inf'), [[[]], [], [[]], []]
+        elif formula_pos == [[]]:
+            return float('inf'), [[[]], [], formula_neg, model_neg]
+        elif formula_neg == [[]]:
+            return float('inf'), [formula_pos, model_pos, [[]], []]
+        elif formula_pos == []:
+            return float('inf'), [[], [], [[]], []]
+        elif formula_neg == []:
+            return float('inf'), [[[]], [], [], []]
+        
+        score_pos = self.compute_score(formula, formula_pos, model, model_pos)
+        score_neg = self.compute_score(formula, formula_neg, model, model_neg)
+        
+        if score_pos >= score_neg:
+            score = score_pos 
+            output = [formula_pos, model_pos,  formula_neg, model_neg]
+        else:
+            score = score_neg
+            output = [formula_neg, model_neg, formula_pos, model_pos]
+        return score, output
+
     def look_ahead(self, formula, literals, model):
         ### return the best literal to propogate or we could just return the best literal propagted formula( not need to do unit propagation again)
         ### Return the formulas and the models
         best_score = 0
-        output = []
+        best_output = []
         for literal in literals:
-            model_pos = model[:]
-            model_neg = model[:]
-            formula_pos, model_pos = self.unit_propagate(formula+[[literal]], model_pos)
-            formula_neg, model_neg = self.unit_propagate(formula+[[-literal]], model_neg)
-            if formula_pos == [[]] and formula_neg == [[]]:
-                return [[]], [], [[]], []
-            elif formula_pos == [[]]:
-                return [[]], [], formula_neg, model_neg
-            elif formula_neg == [[]]:
-                return formula_pos, model_pos, [[]], []
-            elif formula_pos == []:
-                return [], [], [[]], []
-            elif formula_neg == []:
-                return [[]], [], [], []
-            else:
-                score_pos = self.compute_score(formula, formula_pos, model, model_pos)
-                score_neg = self.compute_score(formula, formula_neg, model, model_neg)
-                if score_pos > best_score:
-                    best_score = score_pos
-                    output = [formula_pos, model_pos,  formula_neg, model_neg]
-                if score_neg > best_score:
-                    best_score = score_neg
-                    output = [formula_neg, model_neg, formula_pos, model_pos]
-        return output[0],output[1], output[2], output[3]
+            score, output = self.look_ahead_helper(formula, literal, model)
+            if score == float('inf'):
+                return output[0], output[1], output[2], output[3]
+            if score > best_score:
+                best_score = score
+                best_output = output
+        print(best_output)
+        return best_output[0],best_output[1], best_output[2], best_output[3]
 
     def cube_and_conquer(self, formula, model = []):
         formula, model = self.unit_propagate(formula, model)
@@ -159,7 +170,7 @@ class Cube_and_Conquer_Solver:
         if sat:
             return True, model
         return False, []
-                # Container for results
+        # Container for results
         # results = [None, None]
 
         # # Define a worker function for threads
@@ -184,7 +195,7 @@ class Cube_and_Conquer_Solver:
         #     if sat:
         #         return True, model
         # return False, []
-    
+
     def solve(self):
         sat, model = self.cube_and_conquer(self.clauses)
         print(self.cubes)

@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 from queue import PriorityQueue
 import sys
+import time
 
 class DPLLSolver:
     def __init__(self, file_path):
@@ -11,9 +12,6 @@ class DPLLSolver:
         self.clauses = []
         self.num_vars = 0
         self.num_clauses = 0
-        self.result = False
-        self.formula_queue = PriorityQueue()
-        self.lock = threading.Lock()
         self.read_dimacs_cnf()
 
     def read_dimacs_cnf(self):
@@ -47,8 +45,7 @@ class DPLLSolver:
     #         formula = [[lit for lit in clause if lit != -unit_clause] for clause in formula]
     #     return formula
                         
-    @staticmethod
-    def unit_propagate(formula):
+    def unit_propagate(self, formula):
         unit_clauses = {clause[0] for clause in formula if len(clause) == 1}
         while unit_clauses:
             unit_clause = unit_clauses.pop()
@@ -59,7 +56,7 @@ class DPLLSolver:
                 if -unit_clause in clause:
                     new_clause = [lit for lit in clause if lit != -unit_clause]
                     if len(new_clause) == 0:
-                        return []  # Formula is unsatisfiable
+                        return [[]]  # Formula is unsatisfiable
                     if len(new_clause) == 1:
                         unit_clauses.add(new_clause[0])  # Found a new unit clause
                     new_formula.append(new_clause)
@@ -68,43 +65,47 @@ class DPLLSolver:
             formula = new_formula
         return formula
 
-    @staticmethod
-    def select_literal(formula, method="first"):
+    def select_literal(self, formula, method="first"):
         if method == "first":
             return formula[0][0]
 
-    def dpll(self, formula):
+    def dpll(self, formula): ### Iterative
         formula = self.unit_propagate(formula)
-        if not formula: 
-            with self.lock:
-                self.result = True
-                return
-        elif all(len(clause) != 0 for clause in formula):
-            literal = self.select_literal(formula)
-            with self.lock:
-                self.formula_queue.put(len(formula)+1, formula + [[literal]])
-                self.formula_queue.put(len(formula)+1, formula + [[-literal]])
+        if formula == []:
+            return True
+        if formula == [[]]:
+            return False
+        literal = self.select_literal(formula)
+        pos_formula = formula+[[literal]]
+        neg_formula = formula+[[-literal]]
+        # sat = self.dpll(formula+[[literal]])
+        # if sat:
+        #     return True
+        # sat = self.dpll(formula+[[-literal]])
+        # if sat:
+        #     return True
+        # return False
 
-    def worker(self):
-        while True:
-            with self.lock:
-                if not self.formula_queue:
-                    break
-                _, formula = self.formula_queue.get()
-            self.dpll(formula)
-            if self.result:
-                break
-    
+        # Container for results
+        if literal is not None:
+            pos_formula = formula + [[literal]]
+            neg_formula = formula + [[-literal]]
+
+            # Use ThreadPoolExecutor for parallelism
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                # Submit the tasks and retrieve results
+                futures = [executor.submit(self.dpll, pos_formula), executor.submit(self.dpll, neg_formula)]
+
+                # Wait for the tasks to complete
+                results = [future.result() for future in futures]
+
+            return any(results)
+        else:
+            # No literal to choose, return False
+            return False
+
     def solve(self):
-        self.formula_queue.put(len(self.clauses), self.clauses)
-        with ThreadPoolExecutor(max_workers=cpu_count()) as executor:
-            futures = [executor.submit(self.worker) for _ in range(cpu_count())]
-
-        # Wait for all threads to complete
-        for future in futures:
-            future.result()
-
-        return self.result
+        return self.dpll(self.clauses)
 
 def main():
     if len(sys.argv) != 3:
@@ -113,13 +114,16 @@ def main():
 
     input_file_path = sys.argv[1]
     solver = DPLLSolver(input_file_path)
+    start = time.time()
     sat = solver.solve()
+    end = time.time()
     
     # Write the output to a text file
     output_file_path = sys.argv[2]
     with open(output_file_path, "w") as file:
         file.write(f"Satisfiable: {sat}\n")
     print(f"Output written to {output_file_path}")
+    print(f"Solving time: {end-start}seconds")
 
 if  __name__ == '__main__':
     main()
