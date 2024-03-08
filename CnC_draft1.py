@@ -2,6 +2,8 @@ import sys
 import time 
 from collections import defaultdict
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
 
 class Cube_and_Conquer_Solver:
     def __init__(self, file_path, method="first"):
@@ -12,6 +14,7 @@ class Cube_and_Conquer_Solver:
         self.method = method # For Candidate Selection
         self.num_cubes = 0
         self.cubes = []
+        self.executor = ThreadPoolExecutor()
         self.read_dimacs_cnf()
     
     def read_dimacs_cnf(self):
@@ -89,7 +92,6 @@ class Cube_and_Conquer_Solver:
         # print(formula, model)
         # if self.depth == 16:
         #     return True, model
-        print(f"Number of cubes learnt: {self.num_cubes}")
         self.cubes.append([formula, model])
         return False, []
     
@@ -110,11 +112,19 @@ class Cube_and_Conquer_Solver:
     def compute_score(self, formula, subformula, model, new_model):
         return (len(formula)/len(subformula))*((len(new_model)+1)/(len(model)+1))
 
-    def look_ahead_helper(self, formula, literal, model):
+    def look_ahead_helper(self, args):
+        formula, literal, model = args
         model_pos = model[:]
         model_neg = model[:]
-        formula_pos, model_pos = self.unit_propagate(formula+[[literal]], model_pos)
-        formula_neg, model_neg = self.unit_propagate(formula+[[-literal]], model_neg)
+
+        # Submitting unit_propagate function calls to the ThreadPoolExecutor
+        future_pos = self.executor.submit(self.unit_propagate, formula + [[literal]], model[:])
+        future_neg = self.executor.submit(self.unit_propagate, formula + [[-literal]], model[:])
+
+        # Getting results from the futures
+        formula_pos, model_pos = future_pos.result()
+        formula_neg, model_neg = future_neg.result()
+
         if formula_pos == [[]] and formula_neg == [[]]:
             return float('inf'), [[[]], [], [[]], []]
         elif formula_pos == [[]]:
@@ -138,19 +148,18 @@ class Cube_and_Conquer_Solver:
         return score, output
 
     def look_ahead(self, formula, literals, model):
-        ### return the best literal to propogate or we could just return the best literal propagted formula( not need to do unit propagation again)
-        ### Return the formulas and the models
+        arguments = [(formula, literal, model) for literal in literals]
+        results = list(self.executor.map(self.look_ahead_helper, arguments))
+        
         best_score = 0
         best_output = []
-        for literal in literals:
-            score, output = self.look_ahead_helper(formula, literal, model)
+        for score, output in results:
             if score == float('inf'):
                 return output[0], output[1], output[2], output[3]
             if score > best_score:
                 best_score = score
                 best_output = output
-        print(best_output)
-        return best_output[0],best_output[1], best_output[2], best_output[3]
+        return best_output[0], best_output[1], best_output[2], best_output[3]
 
     def cube_and_conquer(self, formula, model = []):
         formula, model = self.unit_propagate(formula, model)
@@ -198,7 +207,7 @@ class Cube_and_Conquer_Solver:
 
     def solve(self):
         sat, model = self.cube_and_conquer(self.clauses)
-        print(self.cubes)
+        print(f"Number of cubes learnt: {self.num_cubes}")
         return sat, model
     
 def main():
