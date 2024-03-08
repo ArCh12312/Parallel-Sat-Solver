@@ -149,11 +149,13 @@ class Cube_and_Conquer_Solver:
 
     def look_ahead(self, formula, literals, model):
         arguments = [(formula, literal, model) for literal in literals]
-        results = list(self.executor.map(self.look_ahead_helper, arguments))
+        futures = [self.executor.submit(self.look_ahead_helper, arg) for arg in arguments]
         
         best_score = 0
         best_output = []
-        for score, output in results:
+
+        for future in as_completed(futures):
+            score, output = future.result()
             if score == float('inf'):
                 return output[0], output[1], output[2], output[3]
             if score > best_score:
@@ -172,6 +174,7 @@ class Cube_and_Conquer_Solver:
             return self.CDCL_solve(formula, model)
         literals = self.select_candidate_literals(formula)
         best_formula, best_model, alternative_formula, alternative_model = self.look_ahead(formula, literals, model)
+        
         sat, model = self.cube_and_conquer(best_formula, best_model)
         if sat:
             return True, model
@@ -179,31 +182,6 @@ class Cube_and_Conquer_Solver:
         if sat:
             return True, model
         return False, []
-        # Container for results
-        # results = [None, None]
-
-        # # Define a worker function for threads
-        # def worker(formula, model, index):
-        #     sat, model = self.cube_and_conquer(formula, model)
-        #     results[index] = (sat, model)
-
-        # # Create threads for best and alternative formulas
-        # best_thread = threading.Thread(target=worker, args=(best_formula, best_model, 0))
-        # alternative_thread = threading.Thread(target=worker, args=(alternative_formula, alternative_model, 1))
-
-        # # Start threads
-        # best_thread.start()
-        # alternative_thread.start()
-
-        # # Wait for threads to complete
-        # best_thread.join()
-        # alternative_thread.join()
-
-        # # Check results
-        # for sat, model in results:
-        #     if sat:
-        #         return True, model
-        # return False, []
 
     def solve(self):
         sat, model = self.cube_and_conquer(self.clauses)
