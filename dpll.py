@@ -1,11 +1,12 @@
+import sys
+import time
+
 class DPLLSolver:
     def __init__(self, file_path):
         self.file_path = file_path
         self.clauses = []
         self.num_vars = 0
         self.num_clauses = 0
-        self.model = []
-        self.model_stack = []
         self.read_dimacs_cnf()
 
     def read_dimacs_cnf(self):
@@ -20,13 +21,6 @@ class DPLLSolver:
                     clause = [int(x) for x in line.split() if x != '0']
                     if clause:
                         self.clauses.append(clause)
-    
-    def push_model_state(self):
-        self.model_stack.append(self.model.copy())
-
-    def pop_model_state(self):
-        if self.model_stack:
-            self.model = self.model_stack.pop()
 
     def find_unit_clause(formula):
         for clause in formula:
@@ -50,10 +44,6 @@ class DPLLSolver:
                         new_unit_clause = clause[0]
                     new_formula.append(clause)
             formula = new_formula
-            if -unit_clause in self.frequency:
-                del self.frequency[-unit_clause]
-            if unit_clause not in self.model:
-                self.model.append(unit_clause)
             unit_clause = new_unit_clause
         return formula
 
@@ -81,38 +71,36 @@ class DPLLSolver:
             return True
         if formula == -1:
             return False
-        self.push_model_state()
         literal = DPLLSolver.select_literal(formula)
         sat = self.dpll(formula + [[literal]])
         if sat:
             return True
-        self.pop_model_state()
-        self.push_model_state()
         sat = self.dpll(formula + [[-literal]])
         if sat:
             return True
-        self.pop_model_state()
         return False
 
     def solve(self):
-        if self.dpll(self.clauses):
-            return True, self.model
-        return False,[]
+        return self.dpll(self.clauses)
 
-if __name__ == "__main__":
-    import sys
-    if len(sys.argv) < 3 or len(sys.argv) > 4:
-        print("Usage: python dpll.py <input_file_path> <output_file_path> [method]")
+
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: python parallel_dpll.py <input_file_path> <output_file_path>")
         sys.exit(1)
 
     input_file_path = sys.argv[1]
-    method = sys.argv[3] if len(sys.argv) == 4 else "first"  # Default to "first" if not specified
     solver = DPLLSolver(input_file_path)
-    sat, model = solver.solve()
+    start = time.time()
+    sat = solver.solve()
+    end = time.time()
     
     # Write the output to a text file
     output_file_path = sys.argv[2]
     with open(output_file_path, "w") as file:
         file.write(f"Satisfiable: {sat}\n")
-        file.write(f"Model: {model}\n")
     print(f"Output written to {output_file_path}")
+    print(f"Solving time: {end-start}seconds")
+
+if  __name__ == '__main__':
+    main()

@@ -5,20 +5,17 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
 
-class Cube_and_Conquer_Solver:
-    def __init__(self, file_path, method="first"):
-        self.file_path = file_path
+class Look_ahead_Solver:
+    def __init__(self):
         self.clauses = []
         self.num_vars = 0
         self.num_clauses = 0
-        self.method = method # For Candidate Selection
         self.num_cubes = 0
         self.cubes = []
         self.executor = ThreadPoolExecutor()
-        self.read_dimacs_cnf()
     
-    def read_dimacs_cnf(self):
-        with open(self.file_path, 'r') as file:
+    def read_dimacs_cnf(self, file_path):
+        with open(file_path, 'r') as file:
             for line in file:
                 if line.startswith('c') or line.startswith('0') or line.startswith('%'):
                     continue
@@ -38,7 +35,7 @@ class Cube_and_Conquer_Solver:
         return 0
 
     def unit_propagate(self, formula, model=[]):
-        unit_clause = Cube_and_Conquer_Solver.find_unit_clause(formula)
+        unit_clause = Look_ahead_Solver.find_unit_clause(formula)
         while unit_clause != 0:
             new_unit_clause = 0
             new_formula = []
@@ -97,6 +94,7 @@ class Cube_and_Conquer_Solver:
     
     def select_candidate_literals(self, formula):
         # Branching Heuristics?
+        # Use Machine learning to select candidates
         # Jeroslow-Wang Heuristic
         jw_scores = defaultdict(float)
         for clause in formula:
@@ -163,7 +161,7 @@ class Cube_and_Conquer_Solver:
                 best_output = output
         return best_output[0], best_output[1], best_output[2], best_output[3]
 
-    def cube_and_conquer(self, formula, model = []):
+    def look_ahead_dpll(self, formula, model = []):
         formula, model = self.unit_propagate(formula, model)
         # formula = self.pure_literal_elimination(formula, model)
         if formula == []:
@@ -175,41 +173,50 @@ class Cube_and_Conquer_Solver:
         literals = self.select_candidate_literals(formula)
         best_formula, best_model, alternative_formula, alternative_model = self.look_ahead(formula, literals, model)
         
-        sat, model = self.cube_and_conquer(best_formula, best_model)
-        if sat:
-            return True, model
-        sat, model = self.cube_and_conquer(alternative_formula, alternative_model)
-        if sat:
-            return True, model
-        return False, []
+        # Multithreading the Look_ahead function for best and alternative formulas
+        future_best = self.executor.submit(self.look_ahead_dpll, best_formula, best_model)
+        future_alternative = self.executor.submit(self.look_ahead_dpll, alternative_formula, alternative_model)
+        
+        # Wait for both results
+        sat_best, model_best = future_best.result()
+        sat_alternative, model_alternative = future_alternative.result()
 
-    def solve(self):
-        sat, model = self.cube_and_conquer(self.clauses)
+        # Check which one returns satisfiable
+        if sat_best:
+            return True, model_best
+        elif sat_alternative:
+            return True, model_alternative
+        else:
+            return False, []
+
+    def solve(self, file_path):
+        self.read_dimacs_cnf(file_path)
+        sat, model = self.look_ahead_dpll(self.clauses)
         print(f"Number of cubes learnt: {self.num_cubes}")
-        return sat, model
+        return self.cubes
     
-def main():
-    if len(sys.argv) < 3 or len(sys.argv) > 4:
-        print("Usage: python CnC_draft1.py <input_file_path> <output_file_path> [method]")
-        sys.exit(1)
+# def main():
+#     if len(sys.argv) < 3 or len(sys.argv) > 4:
+#         print("Usage: python CnC_draft1.py <input_file_path> <output_file_path> [method]")
+#         sys.exit(1)
 
-    # input_file_path = "./tests/uf20-91/uf20-01.cnf"
-    input_file_path = sys.argv[1]
-    method = sys.argv[3] if len(sys.argv) == 4 else "first"  # Default to "first" if not specified
-    # method = "mfv"
-    solver = Cube_and_Conquer_Solver(input_file_path, method)
-    start = time.time()
-    sat, model = solver.solve()
-    end = time.time()
+#     # input_file_path = "./tests/uf20-91/uf20-01.cnf"
+#     input_file_path = sys.argv[1]
+#     method = sys.argv[3] if len(sys.argv) == 4 else "first"  # Default to "first" if not specified
+#     # method = "mfv"
+#     solver = Look_ahead_Solver(input_file_path, method)
+#     start = time.time()
+#     sat, model = solver.solve()
+#     end = time.time()
     
-    # Write the output to a text file
-    output_file_path = sys.argv[2]
-    # output_file_path = "./dpll_output.txt"
-    with open(output_file_path, "w") as file:
-        file.write(f"Satisfiable: {sat}\n")
-        file.write(f"Model: {model}\n")
-    print(f"Output written to {output_file_path}")
-    print(f"Completed in {end-start}")
+#     # Write the output to a text file
+#     output_file_path = sys.argv[2]
+#     # output_file_path = "./dpll_output.txt"
+#     with open(output_file_path, "w") as file:
+#         file.write(f"Satisfiable: {sat}\n")
+#         file.write(f"Model: {model}\n")
+#     print(f"Output written to {output_file_path}")
+#     print(f"Completed in {end-start}")
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

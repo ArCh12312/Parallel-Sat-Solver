@@ -12,6 +12,7 @@ class DPLLSolver:
         self.clauses = []
         self.num_vars = 0
         self.num_clauses = 0
+        self.executor = ThreadPoolExecutor(max_workers=cpu_count())
         self.read_dimacs_cnf()
 
     def read_dimacs_cnf(self):
@@ -69,6 +70,21 @@ class DPLLSolver:
         if method == "first":
             return formula[0][0]
 
+    # def dpll(self, formula): ### Iterative
+    #     formula = self.unit_propagate(formula)
+    #     if formula == []:
+    #         return True
+    #     if formula == [[]]:
+    #         return False
+    #     literal = self.select_literal(formula)
+    #     sat = self.dpll(formula+[[literal]])
+    #     if sat:
+    #         return True
+    #     sat = self.dpll(formula+[[-literal]])
+    #     if sat:
+    #         return True
+    #     return False
+        
     def dpll(self, formula): ### Iterative
         formula = self.unit_propagate(formula)
         if formula == []:
@@ -76,33 +92,24 @@ class DPLLSolver:
         if formula == [[]]:
             return False
         literal = self.select_literal(formula)
-        pos_formula = formula+[[literal]]
-        neg_formula = formula+[[-literal]]
-        # sat = self.dpll(formula+[[literal]])
-        # if sat:
-        #     return True
-        # sat = self.dpll(formula+[[-literal]])
-        # if sat:
-        #     return True
-        # return False
+        with ThreadPoolExecutor(max_workers=cpu_count()) as executor:
+            futures = [executor.submit(self.dpll_worker, formula + [[literal]]),
+                       executor.submit(self.dpll_worker, formula + [[-literal]])]
+            results = [future.result() for future in futures]
+        return any(results)
 
-        # Container for results
-        if literal is not None:
-            pos_formula = formula + [[literal]]
-            neg_formula = formula + [[-literal]]
-
-            # Use ThreadPoolExecutor for parallelism
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                # Submit the tasks and retrieve results
-                futures = [executor.submit(self.dpll, pos_formula), executor.submit(self.dpll, neg_formula)]
-
-                # Wait for the tasks to complete
-                results = [future.result() for future in futures]
-
-            return any(results)
-        else:
-            # No literal to choose, return False
+    def dpll_worker(self, formula):
+        formula = self.unit_propagate(formula)
+        if formula == []:
+            return True
+        if formula == [[]]:
             return False
+        literal = self.select_literal(formula)
+        
+        futures = [self.executor.submit(self.dpll_worker, formula + [[literal]]),
+                    self.executor.submit(self.dpll_worker, formula + [[-literal]])]
+        results = [future.result() for future in futures]
+        return any(results)
 
     def solve(self):
         return self.dpll(self.clauses)
@@ -127,97 +134,3 @@ def main():
 
 if  __name__ == '__main__':
     main()
-
-# There are 16 cpu cores.
-    # 16 workers.
-    # A worker picks the first formula on the stack and runs dpll on it
-    # Once 2 new formulae have been pushed on to the stack the worker is freed
-    # Then two free workers take one each.
-    # More workers are allocated as the stack grows
-    # This runs until either result is set True(Satisfiable) or there are no formulas left on the stack indicating they all lead to contradictions
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        # sat = DPLLSolver.dpll(formula + [[literal]])
-        # if sat:
-        #     return True
-        # sat = DPLLSolver.dpll(formula + [[-literal]])
-        # if sat:
-        #     return True
-        # return False
-
-    # def dpll_1(self, formula, depth=0):
-    #     if depth == 4:
-    #         print("reached max depth")
-    #         self.formula_stack.append(formula)
-    #         return False
-    #     formula = DPLLSolver.unit_propagate(formula)
-    #     # formula, model = DPLLSolver.pure_literal_elimination(formula, model)
-    #     if not formula:
-    #         return True
-    #     if any(len(clause) == 0 for clause in formula):
-    #         print(1)
-    #         return False
-    #     literal = DPLLSolver.select_literal(formula)
-    #     sat = self.dpll_1(formula + [[literal]], depth+1)
-    #     if sat:
-    #         return True
-    #     sat = self.dpll_1(formula + [[-literal]],  depth+1)
-    #     if sat:
-    #         return True
-    #     return False
-
-    # def dpll(formula):
-    #     formula = DPLLSolver.unit_propagate(formula)
-    #     # formula, model = DPLLSolver.pure_literal_elimination(formula, model)
-    #     if not formula:
-    #         return True
-    #     if any(len(clause) == 0 for clause in formula):
-    #         return False
-    #     literal = DPLLSolver.select_literal(formula)
-    #     sat = DPLLSolver.dpll(formula + [[literal]])
-    #     if sat:
-    #         return True
-    #     sat = DPLLSolver.dpll(formula + [[-literal]])
-    #     if sat:
-    #         return True
-    #     return False
-
-    # def solve(self):
-    #     self.dpll_1(self.clauses)
-    #     with Pool(16) as p:
-    #         result = p.map(DPLLSolver.dpll,self.formula_stack)
-    #     return (any(result))
-    # def solve(self):
-    #     return DPLLSolver.dpll(self.clauses)
-
-
-# if __name__ == "__main__":
-#     import sys
-#     if len(sys.argv) != 3:
-#         print("Usage: python parallel_dpll.py <input_file_path> <output_file_path>")
-#         sys.exit(1)
-
-#     input_file_path = sys.argv[1]
-#     solver = DPLLSolver(input_file_path)
-#     sat = solver.solve()
-    
-#     # Write the output to a text file
-#     output_file_path = sys.argv[2]
-#     with open(output_file_path, "w") as file:
-#         file.write(f"Satisfiable: {sat}\n")
-#     print(f"Output written to {output_file_path}")
