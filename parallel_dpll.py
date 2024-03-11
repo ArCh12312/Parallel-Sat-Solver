@@ -28,12 +28,11 @@ class DPLLSolver:
                     if clause:
                         self.clauses.append(clause)
 
-    # @staticmethod
-    # def find_unit_clause(formula):
-    #     for clause in formula:
-    #         if len(clause) == 1:
-    #             return clause
-    #     return None
+    def find_unit_clause(self, formula):
+        for clause in formula:
+            if len(clause) == 1:
+                return clause[0]
+        return 0
 
     # @staticmethod
     # def unit_propagate(formula):
@@ -46,25 +45,26 @@ class DPLLSolver:
     #         formula = [[lit for lit in clause if lit != -unit_clause] for clause in formula]
     #     return formula
                         
-    def unit_propagate(self, formula):
-        unit_clauses = {clause[0] for clause in formula if len(clause) == 1}
-        while unit_clauses:
-            unit_clause = unit_clauses.pop()
+    def unit_propagate(self, formula, model):
+        unit_clause = self.find_unit_clause(formula)
+        while unit_clause != 0:
+            new_unit_clause = 0
             new_formula = []
             for clause in formula:
                 if unit_clause in clause:
-                    continue  # Remove the entire clause
-                if -unit_clause in clause:
-                    new_clause = [lit for lit in clause if lit != -unit_clause]
-                    if len(new_clause) == 0:
-                        return [[]]  # Formula is unsatisfiable
-                    if len(new_clause) == 1:
-                        unit_clauses.add(new_clause[0])  # Found a new unit clause
-                    new_formula.append(new_clause)
-                else:
-                    new_formula.append(clause)
+                    continue
+                elif -unit_clause in clause:
+                    clause = [lit for lit in clause if lit != -unit_clause]
+                if clause == []:
+                    return -1
+                if len(clause) == 1:
+                    new_unit_clause = clause[0]
+                new_formula.append(clause)
             formula = new_formula
-        return formula
+            if unit_clause not in model:
+                model.append(unit_clause)
+            unit_clause = new_unit_clause
+        return formula, model
 
     def select_literal(self, formula, method="first"):
         if method == "first":
@@ -85,48 +85,49 @@ class DPLLSolver:
     #         return True
     #     return False
         
-    def dpll(self, formula): ### Iterative
-        formula = self.unit_propagate(formula)
+    def dpll(self, formula, model = []): ### Iterative
+        formula, model = self.unit_propagate(formula, model)
         if formula == []:
-            return True
+            return True, model
         if formula == [[]]:
-            return False
+            return False, model
         literal = self.select_literal(formula)
-        with ThreadPoolExecutor(max_workers=cpu_count()) as executor:
-            futures = [executor.submit(self.dpll_worker, formula + [[literal]]),
-                       executor.submit(self.dpll_worker, formula + [[-literal]])]
-            results = [future.result() for future in futures]
-        return any(results)
+        # print(formula)
+        formula_pos = formula+[[literal]]
+        formula_neg = formula+[[-literal]]
 
-    def dpll_worker(self, formula):
-        formula = self.unit_propagate(formula)
-        if formula == []:
-            return True
-        if formula == [[]]:
-            return False
-        literal = self.select_literal(formula)
-        
-        futures = [self.executor.submit(self.dpll_worker, formula + [[literal]]),
-                    self.executor.submit(self.dpll_worker, formula + [[-literal]])]
-        results = [future.result() for future in futures]
-        return any(results)
+        # Parallelize the recursive calls
+        future1 = self.executor.submit(self.dpll, formula_pos, model)
+        future2 = self.executor.submit(self.dpll, formula_neg, model)
+
+        sat1, model1 = future1.result()
+        sat2, model2 = future2.result()
+
+        if sat1:
+            return True, model1
+        elif sat2:
+            return True, model2
+        else:
+            return False, []
 
     def solve(self):
         return self.dpll(self.clauses)
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python parallel_dpll.py <input_file_path> <output_file_path>")
-        sys.exit(1)
+    # if len(sys.argv) != 3:
+    #     print("Usage: python parallel_dpll.py <input_file_path> <output_file_path>")
+    #     sys.exit(1)
 
-    input_file_path = sys.argv[1]
+    # input_file_path = sys.argv[1]
+    input_file_path = "./tests/uf20-91/uf20-01.cnf"
     solver = DPLLSolver(input_file_path)
     start = time.time()
     sat = solver.solve()
     end = time.time()
     
     # Write the output to a text file
-    output_file_path = sys.argv[2]
+    # output_file_path = sys.argv[2]
+    output_file_path = "./dpll_output.txt"
     with open(output_file_path, "w") as file:
         file.write(f"Satisfiable: {sat}\n")
     print(f"Output written to {output_file_path}")
