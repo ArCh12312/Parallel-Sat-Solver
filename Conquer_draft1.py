@@ -122,7 +122,7 @@ class CDCLSolver:
                 self.probability = 0.2
             if self.restart_count > len(model) + 10:  # Avoid excessive restarts
                 self.probability = 0
-        return
+        return model
     
     def analyze_conflict(self, model, conflict_clause):
         # Analyze conflict and generate a learned clause
@@ -185,7 +185,7 @@ class CDCLSolver:
                     return -1, self.restart_count, self.decide_count, self.imp_count, self.learned_count
                 
                 model.append(unit)
-                self.random_restart(model)
+                model = self.random_restart(model)
                 conflict_clause = self.two_watch_propagate(literal, model)
         
         return model, self.restart_count, self.decide_count, self.imp_count, self.learned_count
@@ -210,24 +210,32 @@ def print_statistics(self):
     # Print statistics about solving process
     pass
 
-# def main(cube):
+def main(cube):
     # Main method to read CNF, solve, and print results
-    # solver = CDCLSolver()
+    solver = CDCLSolver()
     # solver.read_cube(cube)
-    # start_time = time.time()
-    # solution = solver.solve()
-    # end_time = time.time()
+    start_time = time.time()
+    model, restart_count, decide_count, imp_count, learned_count = solver.solve(cube)
+    end_time = time.time()
 
-#     if solution == -1:
-#         print("No solution found.")
-#     else:
-#         print("Solution found:", solution)
-#         # solver.write_solution_to_file("solution.cnf")
-#         print("Solution verification result:", solver.verify_solution(solution))
+    if model == -1:
+        print("No solution found.")
+    else:
+        print("Solution found:", model)
+        # solver.write_solution_to_file("solution.cnf")
+        print("Assignment verification result:", solver.verify_solution(model))
+    print()
+    print("Statistics :")
+    print("=============================================")
+    print(f"# Restarts : {restart_count}")
+    print(f"# Learned Clauses : {learned_count}")
+    print(f"# Decisions : {decide_count}")
+    print(f"# Implications : {imp_count}")
+    print("=============================================")
     
-#     # solver.print_statistics()
-#     print("Time taken:", end_time - start_time, "seconds")
+    # solver.print_statistics()
+    print("Time taken:", end_time - start_time, "seconds")
 
-# # Example usage:
-# if __name__ == "__main__":
-#     main(cube = [[[-4, -16, 12], [8, 2, 14], [-9, -19, 14], [7, 4, 18], [-19, -16, 5], [-1, -16], [12, 8, -14], [-1, -2, -3], [-8, 5], [4, 10, 12], [7, 10, 3], [4, 18, 13], [-2, -9, 20], [2, -5, 19], [-8, -13, 20], [-9, 8, 13], [2, -14, -7], [3, 16], [-2, 13], [-18, -13, 16], [-18, 1, -16], [18, 2, 14], [19, 3, -14], [18, -1, 12], [18, -2, -4], [5, 13, -20], [19, -12], [12, 2, -7], [3, 5, -19], [3, 13, -10], [1, 8], [-18, -14, -3], [7, 5, -14], [13, 19, -12], [-12, -7, -3], [9, 7, -19], [20, -1, -4], [-18, 1, 5], [9, 18, 14], [-3, 9], [14, 12, 9], [5, 14, 2], [-10, -8], [14, 9], [-20, 13], [-8, 19, 7], [-7, 3, -1], [-18, 10], [12, -4, 14], [7, 10, 19], [10, -9, 3], [12, 1, -13], [16, -2, -1]], [15, -11, -17, 6]])
+# Example usage:
+if __name__ == "__main__":
+    main(cube = [[[-15, -13, 17], [-19, -4, -16], [-8, -18, -5], [-10, -15, -18], [-13, 20, 5], [-19, -3, -16], [16, -19, -14], [17, 12, -7], [-1, -6, 12], [-12, -5, -20], [-3, 10, -15], [15, -3, -6], [20, -8, 14], [-2, 14, 7], [-18, -19, 11], [-16, -20, -11], [3, -14, -17], [-6, 16, -1], [1, -2, -8], [14, 12, 4], [-5, 9, 15], [18, -2, -5], [-12, -13, -18], [-12, 15, -19], [-12, 20, -3], [-20, 14, 1], [2, -6, 10], [5, -3, -19], [-14, 5, -6], [4, 15, 14], [-18, 8, 15], [-7, -4, -8], [2, -15, -1], [-12, 11, 18], [10, -5, 15], [-5, 8, -12], [2, 12, 17], [8, 9, -2], [-2, -1, 9], [-1, 7, 15], [-19, -15, -14], [-4, 16, -11], [7, -13, 9], [3, -16, 15], [3, 20, -18], [-4, -18, 7], [-13, 8, -10], [-11, 12, -5], [-14, -3, 6], [-19, 14, -9], [-13, 6, 11], [-10, 16, -20], [-5, -12, -1], [9, -2, 17], [-4, -10, 15], [-13, 18, 19], [-2, 17, -1], [15, -14, 17], [19, 14, 4], [7, -19, -4], [-19, 8, -10], [-12, -5, -18], [-9, 13, -5], [-17, 20, 16], [-6, -8, 12], [-5, 8, -20], [-18, -20, -5], [-2, -12, 18], [-16, 17, 5], [-1, 13, -16], [1, -15, 8], [4, 17, -19], [-15, -8, -19], [-9, 2, 15], [-7, 1, -17], [1, -2, 20], [-9, 11, 3], [-6, 8, -1], [-7, -4, 1], [3, -13, -4], [4, 16, -15], [16, 1, 3], [12, -8, -6], [-16, -19, -4], [3, 18, 10], [-2, -4, 19], [-16, -7, 8], [2, -5, 16], [7, 9, 11], [-8, -20, -16], [-15, -3, 17]]])

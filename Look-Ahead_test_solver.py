@@ -159,32 +159,32 @@ class DPLLSolver:
 
     def look_ahead(self, formula, literals, model):
         best_score = 0
-        best_literal = 0
+        best_output = []
         for literal in literals:
             model_pos = model[:]
             model_neg = model[:]
             formula_pos, model_pos = self.unit_propagate_1(formula+[[literal]], model_pos)
             formula_neg, model_neg = self.unit_propagate_1(formula+[[-literal]], model_neg)
             if formula_pos == [[]] and formula_neg == [[]]:
-                return 0
+                return [[]], [], [[]], []
             elif formula_pos == [[]]:
-                return -literal
+                return [[]], [], formula_neg, model_neg
             elif formula_neg == [[]]:
-                return literal
+                return formula_pos, model_pos, [[]], []
             elif formula_pos == []:
-                return literal
+                return formula_pos, model_pos, formula_neg, model_neg
             elif formula_neg == []:
-                return -literal
+                return formula_neg, model_neg, formula_pos, model_pos
             else:
                 score_pos = self.compute_score(formula, formula_pos, model, model_pos)
                 score_neg = self.compute_score(formula, formula_neg, model, model_neg)
                 if score_pos > best_score:
                     best_score = score_pos
-                    best_literal = literal
+                    best_output = [formula_pos, model_pos, formula_neg, model_neg] 
                 if score_neg > best_score:
                     best_score = score_neg
-                    best_literal = -literal
-        return best_literal
+                    best_output = [formula_neg, model_neg, formula_pos, model_pos]
+        return best_output
 
     def dpll(self, formula):
         formula = self.unit_propagate(formula)
