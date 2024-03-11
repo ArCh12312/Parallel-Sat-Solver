@@ -56,7 +56,7 @@ class DPLLSolver:
                 elif -unit_clause in clause:
                     clause = [lit for lit in clause if lit != -unit_clause]
                 if clause == []:
-                    return -1
+                    return [[]], []
                 if len(clause) == 1:
                     new_unit_clause = clause[0]
                 new_formula.append(clause)
@@ -70,21 +70,6 @@ class DPLLSolver:
         if method == "first":
             return formula[0][0]
 
-    # def dpll(self, formula): ### Iterative
-    #     formula = self.unit_propagate(formula)
-    #     if formula == []:
-    #         return True
-    #     if formula == [[]]:
-    #         return False
-    #     literal = self.select_literal(formula)
-    #     sat = self.dpll(formula+[[literal]])
-    #     if sat:
-    #         return True
-    #     sat = self.dpll(formula+[[-literal]])
-    #     if sat:
-    #         return True
-    #     return False
-        
     def dpll(self, formula, model = []): ### Iterative
         formula, model = self.unit_propagate(formula, model)
         if formula == []:
@@ -96,19 +81,29 @@ class DPLLSolver:
         formula_pos = formula+[[literal]]
         formula_neg = formula+[[-literal]]
 
-        # Parallelize the recursive calls
-        future1 = self.executor.submit(self.dpll, formula_pos, model)
-        future2 = self.executor.submit(self.dpll, formula_neg, model)
+        # # Parallelize the recursive calls
+        # future1 = self.executor.submit(self.dpll, formula_pos, model)
+        # future2 = self.executor.submit(self.dpll, formula_neg, model)
 
-        sat1, model1 = future1.result()
-        sat2, model2 = future2.result()
+        # sat1, model1 = future1.result()
+        # sat2, model2 = future2.result()
 
-        if sat1:
-            return True, model1
-        elif sat2:
-            return True, model2
-        else:
-            return False, []
+        # if sat1:
+        #     return True, model1
+        # elif sat2:
+        #     return True, model2
+        # else:
+        #     return False, []
+
+        sat, model = self.dpll(formula_pos, model)
+        if sat:
+            return True, model
+        
+        sat, model = self.dpll(formula_neg, model)
+        if sat:
+            return True, model
+        
+        return False, []
 
     def solve(self):
         return self.dpll(self.clauses)
@@ -119,10 +114,10 @@ def main():
     #     sys.exit(1)
 
     # input_file_path = sys.argv[1]
-    input_file_path = "./tests/uf20-91/uf20-01.cnf"
+    input_file_path = "./tests/uf20-91/uf20-099.cnf"
     solver = DPLLSolver(input_file_path)
     start = time.time()
-    sat = solver.solve()
+    sat, model = solver.solve()
     end = time.time()
     
     # Write the output to a text file
@@ -130,6 +125,7 @@ def main():
     output_file_path = "./dpll_output.txt"
     with open(output_file_path, "w") as file:
         file.write(f"Satisfiable: {sat}\n")
+        file.write(f"Model: {model}\n")
     print(f"Output written to {output_file_path}")
     print(f"Solving time: {end-start}seconds")
 
