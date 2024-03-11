@@ -1,14 +1,13 @@
 class SatVerifier:
-    def __init__(self, clauses, model):
-        self.clauses = clauses
-        self.model = model
+    def __init__(self):
+        pass
 
-    def verify_solution(self):
+    def verify_solution(self, clauses, model):
         # Verify the solution
-        for clause in self.clauses:
+        for clause in clauses:
             flag = False
             for literal in clause:
-                if literal in self.model:  # At least one literal should be true
+                if literal in model:  # At least one literal should be true
                     flag = True
                     break
             if not flag:
