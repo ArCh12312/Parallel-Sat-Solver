@@ -177,6 +177,7 @@ class CDCLSolver:
 
             while conflict_clause is not None:
                 self.vsids_conflict(conflict_clause)
+                self.vsids_decay()
                 learned_clause = self.analyze_conflict(model, conflict_clause)
                 self.add_learned_clause(model, learned_clause)
                 status, unit = self.backjump(model) 

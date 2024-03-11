@@ -85,8 +85,8 @@ class Look_ahead_Solver:
             return True
         return False
 
-    def CDCL_solve(self, formula, model):
-        self.cubes.append([formula, model])
+    def CDCL_solve(self, model):
+        self.cubes.append(model)
         return False, []
     
     def select_candidate_literals(self, formula):
@@ -107,7 +107,7 @@ class Look_ahead_Solver:
     def compute_score(self, formula, subformula, model, new_model):
         return (len(formula)/len(subformula))*((len(new_model)+1)/(len(model)+1))
 
-    def look_ahead(self, formula, literals, model):
+    def look_ahead(self, formula, literals, model, decide_pos):
         best_score = 0
         best_output = []
         for literal in literals:
@@ -116,15 +116,24 @@ class Look_ahead_Solver:
             formula_pos, model_pos = self.unit_propagate(formula+[[literal]], model_pos)
             formula_neg, model_neg = self.unit_propagate(formula+[[-literal]], model_neg)
             if formula_pos == [[]] and formula_neg == [[]]:
-                return [[]], [], [[]], []
+                self.add_learned_clause(0, model, decide_pos)
+                return [[]], [], [[]], [], decide_pos, decide_pos
             elif formula_pos == [[]]:
-                return [[]], [], formula_neg, model_neg
+                self.add_learned_clause(literal, model, decide_pos)
+                decide_pos_1 = decide_pos + [len(model)]
+                return [[]], [], formula_neg, model_neg, decide_pos, decide_pos_1
             elif formula_neg == [[]]:
-                return formula_pos, model_pos, [[]], []
+                self.add_learned_clause(-literal, model, decide_pos)
+                decide_pos_1 = decide_pos + [len(model)]
+                return formula_pos, model_pos, [[]], [], decide_pos_1, decide_pos
             elif formula_pos == []:
-                return formula_pos, model_pos, formula_neg, model_neg
+                decide_pos_1 = decide_pos + [len(model)]
+                # self.append_cube(model, decide_pos, literal)
+                return formula_pos, model_pos, formula_neg, model_neg, decide_pos_1, decide_pos
             elif formula_neg == []:
-                return formula_neg, model_neg, formula_pos, model_pos
+                decide_pos_1 = decide_pos + [len(model)]
+                # self.append_cube(model, decide_pos, literal)
+                return formula_neg, model_neg, formula_pos, model_pos, decide_pos, decide_pos_1
             else:
                 score_pos = self.compute_score(formula, formula_pos, model, model_pos)
                 score_neg = self.compute_score(formula, formula_neg, model, model_neg)
@@ -134,7 +143,8 @@ class Look_ahead_Solver:
                 if score_neg > best_score:
                     best_score = score_neg
                     best_output = [formula_neg, model_neg, formula_pos, model_pos]
-        return best_output[0], best_output[1], best_output[2], best_output[3]
+        decide_pos.append(len(model))
+        return best_output[0], best_output[1], best_output[2], best_output[3], decide_pos, decide_pos
     # def look_ahead_helper(self, args):
     #     formula, literal, model = args
     #     model_pos = model[:]
@@ -186,7 +196,16 @@ class Look_ahead_Solver:
     #             best_output = output
     #     return best_output[0], best_output[1], best_output[2], best_output[3]
 
-    def look_ahead_dpll(self, formula, model = []):
+    def add_learned_clause(self, literal, model, decide_pos):
+        learn_clause = []
+        for pos in decide_pos:
+            learn_clause.append(-model[pos])
+        if literal != 0:
+            learn_clause.append(-literal)
+        self.clauses.append(learn_clause)
+
+
+    def look_ahead_dpll(self, formula, model = [], decide_pos = []):
         formula, model = self.unit_propagate(formula, model)
         # formula = self.pure_literal_elimination(formula, model)
         if formula == []:
@@ -194,9 +213,19 @@ class Look_ahead_Solver:
         if formula == [[]]:
             return False, []
         if self.is_formula_easy(formula, model):
-            return self.CDCL_solve(formula, model)
+            return self.CDCL_solve(model)
         literals = self.select_candidate_literals(formula)
-        best_formula, best_model, alternative_formula, alternative_model = self.look_ahead(formula, literals, model)
+        best_formula, best_model, alternative_formula, alternative_model, decide_pos_1, decide_pos_2 = self.look_ahead(formula, literals, model, decide_pos)
+
+        sat, model = self.look_ahead_dpll(best_formula, best_model, decide_pos_1)
+        if sat:
+            return True, model
+        
+        sat, model = self.look_ahead_dpll(alternative_formula,alternative_model, decide_pos_2)
+        if sat:
+            return True, model
+        
+        return False, []
         
         # # Multithreading the Look_ahead function for best and alternative formulas
         # future_best = self.executor.submit(self.look_ahead_dpll, best_formula, best_model)
@@ -213,16 +242,6 @@ class Look_ahead_Solver:
         #     return True, model_alternative
         # else:
         #     return False, []
-        sat, model = self.look_ahead_dpll(best_formula, best_model)
-        if sat:
-            return True, model
-        
-        sat, model = self.look_ahead_dpll(alternative_formula,alternative_model)
-        if sat:
-            return True, model
-        
-        return False, []
-        
 
     def solve(self, file_path):
         # start = time.time()
@@ -236,13 +255,13 @@ class Look_ahead_Solver:
         return self.clauses, self.cubes
     
 def main():
-    if len(sys.argv) < 3 or len(sys.argv) > 4:
-        print("Usage: python CnC_draft1.py <input_file_path> <output_file_path> [method]")
-        sys.exit(1)
+    # if len(sys.argv) < 3 or len(sys.argv) > 4:
+    #     print("Usage: python CnC_draft1.py <input_file_path> <output_file_path> [method]")
+    #     sys.exit(1)
 
-    # input_file_path = "./tests/uf20-91/uf20-01.cnf"
-    input_file_path = sys.argv[1]
-    method = sys.argv[3] if len(sys.argv) == 4 else "first"  # Default to "first" if not specified
+    input_file_path = "./tests/uf20-91/uf20-01.cnf"
+    # input_file_path = sys.argv[1]
+    # method = sys.argv[3] if len(sys.argv) == 4 else "first"  # Default to "first" if not specified
     # method = "mfv"
     solver = Look_ahead_Solver()
     start = time.time()
@@ -250,8 +269,8 @@ def main():
     end = time.time()
     
     # Write the output to a text file
-    output_file_path = sys.argv[2]
-    # output_file_path = "./dpll_output.txt"
+    # output_file_path = sys.argv[2]
+    output_file_path = "./dpll_output.txt"
     with open(output_file_path, "w") as file:
         file.write(f"Satisfiable: {sat}\n")
         file.write(f"Model: {model}\n")
