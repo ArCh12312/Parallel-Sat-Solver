@@ -67,17 +67,45 @@ class DPLLSolver:
         elif self.method == "random":
             literals = {literal for clause in formula for literal in clause}
             return random.choice(list(literals))
-        elif self.method == "jw":
-            # Jeroslow-Wang Heuristic
+        elif self.method == "jw-one":
+            # JW-One Heuristic
             jw_scores = defaultdict(float)
             for clause in formula:
                 for literal in clause:
-                    jw_scores[literal] += 2**-len(clause)
-                    
-            # Sort the literals based on their Jeroslow-Wang scores in descending order
-            sorted_literals = sorted(jw_scores, key=jw_scores.get, reverse=True)
-            # Return the top 5 literals
-            return sorted_literals[0]
+                    jw_scores[literal] += 2 ** -len(clause)
+            return max(jw_scores, key=jw_scores.get)
+        
+        elif self.method == "jw-two":
+            # JW-Two Heuristic
+            jw_scores = defaultdict(float)
+            for clause in formula:
+                for literal in clause:
+                    jw_scores[abs(literal)] += 2 ** -len(clause)
+            best_var = max(jw_scores, key=jw_scores.get)
+            
+            # Determine the best polarity for the variable
+            pos_score = sum(2 ** -len(clause) for clause in formula if best_var in clause)
+            neg_score = sum(2 ** -len(clause) for clause in formula if -best_var in clause)
+            return best_var if pos_score >= neg_score else -best_var
+        
+        elif self.method == "dlis":
+            scores = defaultdict(int)
+            for clause in formula:
+                for literal in clause:
+                    scores[literal] += 1
+            return max(scores, key=scores.get)
+        
+        elif self.method == "moms":
+            min_clause_size = min(len(clause) for clause in formula) if formula else 0
+            clause_counts = defaultdict(int)
+            for clause in formula:
+                if len(clause) == min_clause_size:
+                    for literal in clause:
+                        clause_counts[literal] += 1
+            return max(clause_counts, key=clause_counts.get) if clause_counts else None
+
+        else:
+            return formula[0][0]
 
     def dpll(self, formula, model = []):
         formula, model = self.unit_propagate(formula, model)
@@ -129,7 +157,7 @@ class DPLLSolver:
                 return False
         return True
 
-    def solve(self, input_file_path, method = "first"):
+    def solve(self, input_file_path, method = "static"):
         start = time.time()
         self.read_dimacs_cnf(input_file_path)
         end = time.time()
@@ -149,7 +177,7 @@ def main():
     # input_file_path = "./tests/uf20-91/uf20-01.cnf"
     input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
     # input_file_path = input("Enter input file path: ")
-    method = input("Enter Branching heuristic(Static/Random/JW): ")
+    method = input("Enter Branching heuristic(Static/Random/JW-one/JW-two): ")
     method = str.lower(method)
     solver = DPLLSolver()
     sat, model, verification_result, read_time, solve_time = solver.solve(input_file_path, method)
