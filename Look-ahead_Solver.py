@@ -6,6 +6,7 @@ class Look_ahead_Solver:
         self.clauses = []
         self.num_vars = 0
         self.num_clauses = 0
+        self.branch_count = 0
     
     def read_dimacs_cnf(self, file_path):
         with open(file_path, 'r') as file:
@@ -74,7 +75,16 @@ class Look_ahead_Solver:
         return sorted_literals[:5]
 
     def compute_score(self, formula, subformula, model, new_model):
-        return (len(formula)/len(subformula))*((len(new_model)+1)/(len(model)+1))
+        # Reduction in the number of clauses
+        clause_reduction_ratio = (len(formula) - len(subformula)) / max(len(formula), 1)
+
+        # Increase in the model size (i.e., how many literals are decided)
+        model_increase_ratio = (len(new_model) - len(model)) / max(len(model), 1)
+
+        # Prioritize reducing the formula size and increasing the model size
+        score = clause_reduction_ratio * 2 + model_increase_ratio
+
+        return score
 
     def look_ahead(self, formula, literals, model):
         best_score = 0
@@ -116,6 +126,8 @@ class Look_ahead_Solver:
         literals = self.select_candidate_literals(formula)
         best_formula, best_model, alternative_formula, alternative_model = self.look_ahead(formula, literals, model)
         
+        self.branch_count += 1
+
         sat, model = self.look_ahead_dpll(best_formula, best_model)
         if sat:
             return True, model
@@ -165,28 +177,30 @@ class Look_ahead_Solver:
             verification_result = self.verify_solution(model)
         else:
             verification_result = True
-        return sat, model, verification_result, read_time, solve_time
+        return sat, model, verification_result, self.branch_count, read_time, solve_time
 
 def main():
     # input_file_path = "./tests/uf20-91/uf20-01.cnf"
     # input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
-    input_file_path = "./bmc-1.cnf"
+    input_file_path = "./tests/uf100-01.cnf"
     # input_file_path = input("Enter input file path: ")
     solver = Look_ahead_Solver()
-    sat, model, verification_result, read_time, solve_time = solver.solve(input_file_path)
+    sat, model, verification_result, branch_count, read_time, solve_time = solver.solve(input_file_path)
 
     # Write the output to a text file
-    output_file_path = "./dpll_output.txt"
+    output_file_path = "./log_file.txt"
     with open(output_file_path, "w") as file:
-        file.write(f"Read time: {read_time} seconds")
+        file.write(f"Read time: {read_time} seconds\n")
         file.write(f"Satisfiable: {sat}\n")
         file.write(f"Model: {model}\n")
-        file.write(f"Assignment verification result: {verification_result}")
-        file.write(f"Solving time: {solve_time} seconds")
+        file.write(f"Assignment verification result: {verification_result}\n")
+        file.write(f"Branch count: {branch_count}\n")
+        file.write(f"Solving time: {solve_time} seconds\n")
     print(f"Read time: {read_time} seconds")
     print(f"Satisfiable: {sat}")
     print(f"Model: {model}")
     print(f"Assignment verification result: {verification_result}")
+    print(f"Branch count: {branch_count}")
     print(f"Solving time: {solve_time} seconds")
     print(f"Output written to {output_file_path}")
 

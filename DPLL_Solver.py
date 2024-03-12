@@ -5,6 +5,7 @@ class DPLLSolver:
         self.clauses = []
         self.num_vars = 0
         self.num_clauses = 0
+        self.branch_count = 0
 
     def read_dimacs_cnf(self, input_file_path):
         with open(input_file_path, 'r') as file:
@@ -65,15 +66,19 @@ class DPLLSolver:
     def dpll(self, formula, model = []):
         formula, model = self.unit_propagate(formula, model)
         formula, model = self.pure_literal_elimination(formula, model)
+
         if formula == []:
             return True, model
         if formula == [[]]:
             return False, []
+        
         literal = self.select_literal(formula)
         pos_formula = formula + [[literal]]
         neg_formula = formula + [[-literal]]
         pos_model = model[:]
         neg_model = model[:]
+
+        self.branch_count += 1
 
         sat_pos, pos_model = self.dpll(pos_formula, pos_model)
         if sat_pos:
@@ -124,27 +129,29 @@ class DPLLSolver:
             verification_result = self.verify_solution(model)
         else:
             verification_result = True
-        return sat, model, verification_result, read_time, solve_time
+        return sat, model, verification_result, self.branch_count, read_time, solve_time
 
 def main():
     # input_file_path = "./tests/uf20-91/uf20-01.cnf"
     # input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
     input_file_path = input("Enter input file path: ")
     solver = DPLLSolver()
-    sat, model, verification_result, read_time, solve_time = solver.solve(input_file_path)
+    sat, model, verification_result, branch_count, read_time, solve_time = solver.solve(input_file_path)
 
     # Write the output to a text file
-    output_file_path = "./dpll_output.txt"
+    output_file_path = "./log_file.txt"
     with open(output_file_path, "w") as file:
         file.write(f"Read time: {read_time} seconds\n")
         file.write(f"Satisfiable: {sat}\n")
         file.write(f"Model: {model}\n")
         file.write(f"Assignment verification result: {verification_result}\n")
+        file.write(f"Branch count: {branch_count}\n")
         file.write(f"Solving time: {solve_time} seconds\n")
     print(f"Read time: {read_time} seconds")
     print(f"Satisfiable: {sat}")
     print(f"Model: {model}")
     print(f"Assignment verification result: {verification_result}")
+    print(f"Branch count: {branch_count}")
     print(f"Solving time: {solve_time} seconds")
     print(f"Output written to {output_file_path}")
 
