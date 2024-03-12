@@ -185,11 +185,11 @@ def main():
     # Write the output to a text file
     output_file_path = "./dpll_output.txt"
     with open(output_file_path, "w") as file:
-        file.write(f"Read time: {read_time} seconds")
+        file.write(f"Read time: {read_time} seconds\n")
         file.write(f"Satisfiable: {sat}\n")
         file.write(f"Model: {model}\n")
-        file.write(f"Assignment verification result: {verification_result}")
-        file.write(f"Solving time: {solve_time} seconds")
+        file.write(f"Assignment verification result: {verification_result}\n")
+        file.write(f"Solving time: {solve_time} seconds\n")
     print(f"Read time: {read_time} seconds")
     print(f"Satisfiable: {sat}")
     print(f"Model: {model}")
