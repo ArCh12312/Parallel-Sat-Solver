@@ -7,7 +7,7 @@ class DPLLSolver:
         self.clauses = []
         self.num_vars = 0
         self.num_clauses = 0
-        self.method = "first"
+        self.method = "static"
 
     def read_dimacs_cnf(self, input_file_path):
         with open(input_file_path, 'r') as file:
