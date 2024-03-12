@@ -1,10 +1,11 @@
 # from multiprocessing import Process, Pool, cpu_count, Manager, Value, Lock
 from multiprocessing import cpu_count
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import threading
-from queue import PriorityQueue
+from queue import PriorityQueue, Queue
 import sys
 import time
+from collections  import defaultdict
 
 class DPLLSolver:
     def __init__(self, file_path):
@@ -12,6 +13,8 @@ class DPLLSolver:
         self.clauses = []
         self.num_vars = 0
         self.num_clauses = 0
+        self.cubes = []
+        self.formula_queue = Queue()
         self.executor = ThreadPoolExecutor(max_workers=cpu_count())
         self.read_dimacs_cnf()
 
@@ -67,54 +70,92 @@ class DPLLSolver:
         return formula, model
 
     def select_literal(self, formula, method="first"):
-        if method == "first":
-            return formula[0][0]
+        jw_scores = defaultdict(float)
+        for clause in formula:
+            for literal in clause:
+                jw_scores[literal] += 2**-len(clause)
+                
+        # Sort the literals based on their Jeroslow-Wang scores in descending order
+        sorted_literals = sorted(jw_scores, key=jw_scores.get, reverse=True)
+        # Return the top 5 literals
+        return sorted_literals[0]
+        # if method == "first":
+        #     return formula[0][0]
 
-    def dpll(self, formula, model = []): ### Iterative
+    def dpll_1(self, formula, model = [], depth = 0):
         formula, model = self.unit_propagate(formula, model)
         if formula == []:
             return True, model
         if formula == [[]]:
-            return False, model
+            return False, []
         literal = self.select_literal(formula)
-        # print(formula)
-        formula_pos = formula+[[literal]]
-        formula_neg = formula+[[-literal]]
+        pos_formula = formula + [[literal]]
+        neg_formula = formula + [[-literal]]
+        pos_model = model[:]
+        neg_model = model[:]
 
-        # # Parallelize the recursive calls
-        # future1 = self.executor.submit(self.dpll, formula_pos, model)
-        # future2 = self.executor.submit(self.dpll, formula_neg, model)
+        if depth == 3:
+            self.cubes.append([pos_formula, model])
+            self.cubes.append([neg_formula, model])
+            return False, []
 
-        # sat1, model1 = future1.result()
-        # sat2, model2 = future2.result()
+        else:
+            depth += 1
+            sat_pos, pos_model = self.dpll(pos_formula, pos_model, depth)
+            if sat_pos:
+                return True, pos_model
 
-        # if sat1:
-        #     return True, model1
-        # elif sat2:
-        #     return True, model2
-        # else:
-        #     return False, []
+            sat_neg, neg_model = self.dpll(neg_formula, neg_model, depth)
+            if sat_neg:
+                return True, neg_model
 
-        sat, model = self.dpll(formula_pos, model)
-        if sat:
+            return False, []
+
+    def dpll(self, formula, model = [], depth =0):
+        formula, model = self.unit_propagate(formula, model)
+        if formula == []:
             return True, model
-        
-        sat, model = self.dpll(formula_neg, model)
-        if sat:
-            return True, model
-        
+        if formula == [[]]:
+            return False, []
+        literal = self.select_literal(formula)
+        pos_formula = formula + [[literal]]
+        neg_formula = formula + [[-literal]]
+        pos_model = model[:]
+        neg_model = model[:]
+
+        depth += 1
+        sat_pos, pos_model = self.dpll(pos_formula, pos_model, depth)
+        if sat_pos:
+            return True, pos_model
+
+        sat_neg, neg_model = self.dpll(neg_formula, neg_model, depth)
+        if sat_neg:
+            return True, neg_model
+
+        return False, []
+
+    def dpll_parallel(self):
+        with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
+            futures = [executor.submit(self.dpll, cube[0], cube[1]) for cube in self.cubes]
+            for future in futures:
+                sat, model = future.result()
+                if sat:
+                    return True, model
         return False, []
 
     def solve(self):
-        return self.dpll(self.clauses)
-
+        sat, model = self.dpll_1(self.clauses)
+        if not sat and len(self.cubes) == 0:
+            return self.dpll_parallel()
+        return sat, model 
+    
 def main():
     # if len(sys.argv) != 3:
     #     print("Usage: python parallel_dpll.py <input_file_path> <output_file_path>")
     #     sys.exit(1)
 
     # input_file_path = sys.argv[1]
-    input_file_path = "./tests/uf20-91/uf20-099.cnf"
+    input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
     solver = DPLLSolver(input_file_path)
     start = time.time()
     sat, model = solver.solve()

@@ -17,6 +17,7 @@ class CDCLSolver:
         self.learned_count = 0
         self.decide_pos = []
         self.back = []
+        self.model = []
         self.solution = None
 
     def read_cube(self, cube):
@@ -52,12 +53,12 @@ class CDCLSolver:
             self.counter[literal] *= .95
         return
 
-    def vsids_decide(self, model):
+    def vsids_decide(self):
         # Choose a variable based on VSIDS heuristic
         max=0
         var=0
         for literal in self.counter:
-            if self.counter[literal]>max and literal not in model and -literal not in model:
+            if self.counter[literal]>max and literal not in self.model and -literal not in self.model:
                     max=self.counter[literal]
                     var=literal
         return var
@@ -80,7 +81,7 @@ class CDCLSolver:
 
         return
     
-    def two_watch_propagate(self, literal, model):
+    def two_watch_propagate(self, literal):
         # Perform 2-literal watch propagation
         propagation_queue = [literal]
         while propagation_queue:
@@ -90,13 +91,13 @@ class CDCLSolver:
                 watched_literal_1 = self.clauses_literal_watched[clause_index][0]
                 watched_literal_2 = self.clauses_literal_watched[clause_index][1]
                 # Case that the clause is satisfied
-                if watched_literal_1 in model or watched_literal_2 in model:  # If one of the watched literals is already true
+                if watched_literal_1 in self.model or watched_literal_2 in self.model:  # If one of the watched literals is already true
                     continue  # Skip to the next watched clause
-                unassigned_literals = [new_literal for new_literal in clause if -new_literal not in model]
+                unassigned_literals = [new_literal for new_literal in clause if -new_literal not in self.model]
                 if len(unassigned_literals) == 1:
-                    if unassigned_literals[0] not in model:
+                    if unassigned_literals[0] not in self.model:
                         propagation_queue.append(unassigned_literals[0])
-                        model.append(unassigned_literals[0])
+                        self.model.append(unassigned_literals[0])
                         continue
                     new_literal = watched_literal_1 if watched_literal_1 != -literal else watched_literal_2
                     unassigned_literals.append(new_literal)
@@ -111,50 +112,50 @@ class CDCLSolver:
                 self.literal_watch [unassigned_literals[1]].append(clause_index)
         return None # No conflict Detected
 
-    def random_restart(self, model):
+    def random_restart(self):
         # Perform random restarts with decaying probability
         if random.random() < self.probability:  # If the generated random probability is less than the current probability
-            model = self.back[:]
+            self.model = self.back[:]
             self.decide_pos = []  # Clear the decision position list
             self.probability *= 0.5  # Decay the probability by 50%
             self.restart_count += 1  # Increment the restart count
             if self.probability < 0.001:  # Ensure minimum probability
                 self.probability = 0.2
-            if self.restart_count > len(model) + 10:  # Avoid excessive restarts
+            if self.restart_count > len(self.model) + 10:  # Avoid excessive restarts
                 self.probability = 0
-        return model
+        return
     
-    def analyze_conflict(self, model, conflict_clause):
+    def analyze_conflict(self, conflict_clause):
         # Analyze conflict and generate a learned clause
         learn = []
         for x in self.decide_pos:
-            learn.append(-model[x])
+            learn.append(-self.model[x])
         return learn
 
-    def backjump(self, model): ### Change this to use dec_level
-        self.imp_count += len(model) - len(self.decide_pos)
+    def backjump(self): ### Change this to use dec_level
+        self.imp_count += len(self.model) - len(self.decide_pos)
         # Perform backjumping to a decision level
         if not self.decide_pos:
             return -1,-1
         dec_level = self.decide_pos.pop()
-        literal = model[dec_level]
-        del model[dec_level:]
+        literal = self.model[dec_level]
+        del self.model[dec_level:]
         return 0,-literal
 
-    def all_vars_assigned(self, model):        # Returns True if all variables already assigne , False otherwise
-        return len(model) >= self.num_vars
+    def all_vars_assigned(self):        # Returns True if all variables already assigne , False otherwise
+        return len(self.model) >= self.num_vars
     
-    def assign(self,literal,model):             # Adds the decision literal to M and correponding update to decision level
-        self.decide_pos.append(len(model))
-        model.append(literal)
-        return model
+    def assign(self,literal):             # Adds the decision literal to M and correponding update to decision level
+        self.decide_pos.append(len(self.model))
+        self.model.append(literal)
+        return
 
-    def add_learned_clause(self, model, learned_clause):
+    def add_learned_clause(self, learned_clause):
         self.learned_count += 1
         if len(learned_clause) == 0:
             return
         if len(learned_clause) == 1:
-            model.append(learned_clause[0])
+            self.model.append(learned_clause[0])
             return 1, learned_clause[0]
         self.clauses_literal_watched.append([learned_clause[0],learned_clause[1]])
         self.literal_watch[learned_clause[0]].append(self.num_clauses)
@@ -166,30 +167,29 @@ class CDCLSolver:
     def solve(self, cube):
         # Solve the CNF formula using CDCL algorithm
         self.read_cube(cube)
-        model = []
         self.vsids_init()
         self.init_watch_list()
-        while not self.all_vars_assigned(model):
-            literal = self.vsids_decide(model)
+        while not self.all_vars_assigned():
+            literal = self.vsids_decide()
             self.decide_count += 1
-            model = self.assign(literal, model)
-            conflict_clause = self.two_watch_propagate(literal, model)
+            self.assign(literal)
+            conflict_clause = self.two_watch_propagate(literal)
 
             while conflict_clause is not None:
                 self.vsids_conflict(conflict_clause)
                 self.vsids_decay()
-                learned_clause = self.analyze_conflict(model, conflict_clause)
-                self.add_learned_clause(model, learned_clause)
-                status, unit = self.backjump(model) 
+                learned_clause = self.analyze_conflict(conflict_clause)
+                self.add_learned_clause(learned_clause)
+                status, unit = self.backjump() 
             
                 if status == -1:
                     return -1, self.restart_count, self.decide_count, self.imp_count, self.learned_count
                 
-                model.append(unit)
-                model = self.random_restart(model)
-                conflict_clause = self.two_watch_propagate(literal, model)
+                self.model.append(unit)
+                self.random_restart()
+                conflict_clause = self.two_watch_propagate(literal)
         
-        return model, self.restart_count, self.decide_count, self.imp_count, self.learned_count
+        return self.model, self.restart_count, self.decide_count, self.imp_count, self.learned_count
 
     def verify_solution(self, model):
         # Verify the solution

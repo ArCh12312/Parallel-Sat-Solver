@@ -150,17 +150,20 @@ class DPLLSolver:
         return self.dpll(self.clauses)
         
 def main():
-    if len(sys.argv) < 3 or len(sys.argv) > 4:
-        print("Usage: python dpll.py <input_file_path> <output_file_path> [method]")
-        sys.exit(1)
+    # if len(sys.argv) < 3 or len(sys.argv) > 4:
+    #     print("Usage: python dpll.py <input_file_path> <output_file_path> [method]")
+    #     sys.exit(1)
 
-    input_file_path = sys.argv[1]
-    method = sys.argv[3] if len(sys.argv) == 4 else "first"  # Default to "first" if not specified
+    # input_file_path = sys.argv[1]
+    input_file_path = "./tests/uf20-91/uf20-01000.cnf"
+    # method = sys.argv[3] if len(sys.argv) == 4 else "first"  # Default to "first" if not specified
+    method = "first"
     solver = DPLLSolver(input_file_path, method)
     sat, model = solver.solve()
     
     # Write the output to a text file
-    output_file_path = sys.argv[2]
+    # output_file_path = sys.argv[2]
+    output_file_path = "./dpll_output.txt"
     with open(output_file_path, "w") as file:
         file.write(f"Satisfiable: {sat}\n")
         file.write(f"Model: {model}\n")
