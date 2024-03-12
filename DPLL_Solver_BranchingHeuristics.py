@@ -175,9 +175,9 @@ class DPLLSolver:
 
 def main():
     # input_file_path = "./tests/uf20-91/uf20-01.cnf"
-    input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
-    # input_file_path = input("Enter input file path: ")
-    method = input("Enter Branching heuristic(Static/Random/JW-one/JW-two): ")
+    # input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
+    input_file_path = input("Enter input file path: ")
+    method = input("Enter Branching heuristic(Static/Random/JW-one/JW-two/DLIS/MOMS): ")
     method = str.lower(method)
     solver = DPLLSolver()
     sat, model, verification_result, read_time, solve_time = solver.solve(input_file_path, method)
