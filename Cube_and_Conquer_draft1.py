@@ -1,5 +1,5 @@
 import time
-from CnC_draft1 import Look_ahead_Solver
+from Cubing_draft1 import Look_ahead_Solver
 from Conquer_draft1 import CDCLSolver
 
 class Cube_and_Conquer_solver:
@@ -15,8 +15,9 @@ class Cube_and_Conquer_solver:
 
     def solve(self, file_path):
         self.clauses, cubes = self.look_ahead_solver.solve(file_path)
+        clauses = self.clauses[:]
         for cube in cubes:
-            model, restart_count, decide_count, imp_count, learned_count = self.cdcl_solver.solve(cube)
+            model, restart_count, decide_count, imp_count, learned_count = self.cdcl_solver.solve(clauses, cube)
             self.total_implication_count = imp_count 
             self.total_restart_count = restart_count
             self.total_decide_count = decide_count

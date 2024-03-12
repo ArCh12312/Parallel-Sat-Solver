@@ -101,17 +101,17 @@ class DPLLSolver:
 
         else:
             depth += 1
-            sat_pos, pos_model = self.dpll(pos_formula, pos_model, depth)
+            sat_pos, pos_model = self.dpll_1(pos_formula, pos_model, depth)
             if sat_pos:
                 return True, pos_model
 
-            sat_neg, neg_model = self.dpll(neg_formula, neg_model, depth)
+            sat_neg, neg_model = self.dpll_1(neg_formula, neg_model, depth)
             if sat_neg:
                 return True, neg_model
 
             return False, []
 
-    def dpll(self, formula, model = [], depth =0):
+    def dpll(self, formula, model = []):
         formula, model = self.unit_propagate(formula, model)
         if formula == []:
             return True, model
@@ -123,20 +123,20 @@ class DPLLSolver:
         pos_model = model[:]
         neg_model = model[:]
 
-        depth += 1
-        sat_pos, pos_model = self.dpll(pos_formula, pos_model, depth)
+        sat_pos, pos_model = self.dpll(pos_formula, pos_model)
         if sat_pos:
             return True, pos_model
 
-        sat_neg, neg_model = self.dpll(neg_formula, neg_model, depth)
+        sat_neg, neg_model = self.dpll(neg_formula, neg_model)
         if sat_neg:
             return True, neg_model
 
         return False, []
 
     def dpll_parallel(self):
-        with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
-            futures = [executor.submit(self.dpll, cube[0], cube[1]) for cube in self.cubes]
+        cubes = self.cubes
+        with ThreadPoolExecutor(max_workers=cpu_count()) as executor:
+            futures = [executor.submit(self.dpll, cube[0], cube[1]) for cube in cubes]
             for future in futures:
                 sat, model = future.result()
                 if sat:
@@ -145,7 +145,7 @@ class DPLLSolver:
 
     def solve(self):
         sat, model = self.dpll_1(self.clauses)
-        if not sat and len(self.cubes) == 0:
+        if not sat and len(self.cubes) != 0:
             return self.dpll_parallel()
         return sat, model 
     
@@ -155,7 +155,7 @@ def main():
     #     sys.exit(1)
 
     # input_file_path = sys.argv[1]
-    input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
+    input_file_path = "./tests/UF250.1065.100/uf250-02.cnf"
     solver = DPLLSolver(input_file_path)
     start = time.time()
     sat, model = solver.solve()

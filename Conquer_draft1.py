@@ -10,7 +10,7 @@ class CDCLSolver:
         self.counter = {}
         self.literal_watch = {}
         self.clauses_literal_watched = []
-        self.probability = 0.9
+        self.probability = 1.0
         self.restart_count = 0
         self.imp_count = 0
         self.decide_count = 0
@@ -20,15 +20,44 @@ class CDCLSolver:
         self.model = []
         self.solution = None
 
-    def read_cube(self, cube):
+    def read_cube(self, clauses, cube):
         # Read the cube given by the Look-ahead solver and initialize clauses, num_vars, and num_clauses
-        self.clauses = cube[0]
+        for literal in cube:
+            self.clauses.append([literal])
+        self.clauses += clauses
         unique_variables = set()
         for clause in self.clauses:
             for variable in clause:
                 unique_variables.add(abs(variable))
         self.num_vars = len(unique_variables)
         self.num_clauses = len(self.clauses)
+        return
+    
+    def find_unit_clause(self):
+        for clause in self.clauses:
+            if len(clause) == 1:
+                return clause[0]
+        return 0
+
+    def unit_propagate(self):
+        unit_clause = self.find_unit_clause()
+        while unit_clause != 0:
+            new_unit_clause = 0
+            new_formula = []
+            for clause in self.clauses:
+                if unit_clause in clause:
+                    continue
+                elif -unit_clause in clause:
+                    clause = [lit for lit in clause if lit != -unit_clause]
+                if clause == []:
+                    return [[]], []
+                if len(clause) == 1:
+                    new_unit_clause = clause[0]
+                new_formula.append(clause)
+            self.clauses = new_formula
+            if unit_clause not in self.model:
+                self.model.append(unit_clause)
+            unit_clause = new_unit_clause
         return
 
     def vsids_init(self):
@@ -125,7 +154,7 @@ class CDCLSolver:
                 self.probability = 0
         return
     
-    def analyze_conflict(self, conflict_clause):
+    def analyze_conflict(self):
         # Analyze conflict and generate a learned clause
         learn = []
         for x in self.decide_pos:
@@ -156,7 +185,10 @@ class CDCLSolver:
             return
         if len(learned_clause) == 1:
             self.model.append(learned_clause[0])
-            return 1, learned_clause[0]
+            self.clauses_literal_watched.append([learned_clause[0]])
+            self.literal_watch[learned_clause[0]].append(self.num_clauses)
+            self.clauses.append(learned_clause)
+            return
         self.clauses_literal_watched.append([learned_clause[0],learned_clause[1]])
         self.literal_watch[learned_clause[0]].append(self.num_clauses)
         self.literal_watch[learned_clause[1]].append(self.num_clauses)
@@ -164,9 +196,17 @@ class CDCLSolver:
         return 
 
 
-    def solve(self, cube):
+    def solve(self, clauses, cube):
         # Solve the CNF formula using CDCL algorithm
-        self.read_cube(cube)
+        self.read_cube(clauses, cube)
+        self.unit_propagate()
+        if self.clauses == []:
+            print("solved!")
+            return self.model, self.restart_count, self.decide_count, self.imp_count, self.learned_count
+        if self.clauses == [[]]:
+            return -1, self.restart_count, self.decide_count, self.imp_count, self.learned_count
+        self.back = self.model[:]
+        self.num_clauses = len(self.clauses)
         self.vsids_init()
         self.init_watch_list()
         while not self.all_vars_assigned():
@@ -178,7 +218,7 @@ class CDCLSolver:
             while conflict_clause is not None:
                 self.vsids_conflict(conflict_clause)
                 self.vsids_decay()
-                learned_clause = self.analyze_conflict(conflict_clause)
+                learned_clause = self.analyze_conflict()
                 self.add_learned_clause(learned_clause)
                 status, unit = self.backjump() 
             
@@ -187,7 +227,7 @@ class CDCLSolver:
                 
                 self.model.append(unit)
                 self.random_restart()
-                conflict_clause = self.two_watch_propagate(literal)
+                conflict_clause = self.two_watch_propagate(unit)
         
         return self.model, self.restart_count, self.decide_count, self.imp_count, self.learned_count
 
@@ -200,6 +240,7 @@ class CDCLSolver:
                     flag = True
                     break
             if not flag:
+                print(clause)
                 return False
         return True
 
@@ -211,12 +252,12 @@ def print_statistics(self):
     # Print statistics about solving process
     pass
 
-def main(cube):
+def main(clauses, cube):
     # Main method to read CNF, solve, and print results
     solver = CDCLSolver()
     # solver.read_cube(cube)
     start_time = time.time()
-    model, restart_count, decide_count, imp_count, learned_count = solver.solve(cube)
+    model, restart_count, decide_count, imp_count, learned_count = solver.solve(clauses, cube)
     end_time = time.time()
 
     if model == -1:
@@ -239,4 +280,5 @@ def main(cube):
 
 # Example usage:
 if __name__ == "__main__":
-    main(cube = [[[-15, -13, 17], [-19, -4, -16], [-8, -18, -5], [-10, -15, -18], [-13, 20, 5], [-19, -3, -16], [16, -19, -14], [17, 12, -7], [-1, -6, 12], [-12, -5, -20], [-3, 10, -15], [15, -3, -6], [20, -8, 14], [-2, 14, 7], [-18, -19, 11], [-16, -20, -11], [3, -14, -17], [-6, 16, -1], [1, -2, -8], [14, 12, 4], [-5, 9, 15], [18, -2, -5], [-12, -13, -18], [-12, 15, -19], [-12, 20, -3], [-20, 14, 1], [2, -6, 10], [5, -3, -19], [-14, 5, -6], [4, 15, 14], [-18, 8, 15], [-7, -4, -8], [2, -15, -1], [-12, 11, 18], [10, -5, 15], [-5, 8, -12], [2, 12, 17], [8, 9, -2], [-2, -1, 9], [-1, 7, 15], [-19, -15, -14], [-4, 16, -11], [7, -13, 9], [3, -16, 15], [3, 20, -18], [-4, -18, 7], [-13, 8, -10], [-11, 12, -5], [-14, -3, 6], [-19, 14, -9], [-13, 6, 11], [-10, 16, -20], [-5, -12, -1], [9, -2, 17], [-4, -10, 15], [-13, 18, 19], [-2, 17, -1], [15, -14, 17], [19, 14, 4], [7, -19, -4], [-19, 8, -10], [-12, -5, -18], [-9, 13, -5], [-17, 20, 16], [-6, -8, 12], [-5, 8, -20], [-18, -20, -5], [-2, -12, 18], [-16, 17, 5], [-1, 13, -16], [1, -15, 8], [4, 17, -19], [-15, -8, -19], [-9, 2, 15], [-7, 1, -17], [1, -2, 20], [-9, 11, 3], [-6, 8, -1], [-7, -4, 1], [3, -13, -4], [4, 16, -15], [16, 1, 3], [12, -8, -6], [-16, -19, -4], [3, 18, 10], [-2, -4, 19], [-16, -7, 8], [2, -5, 16], [7, 9, 11], [-8, -20, -16], [-15, -3, 17]]])
+    main(clauses = [[-15, -13, 17], [-19, -4, -16], [-8, -18, -5], [-10, -15, -18], [-13, 20, 5], [-19, -3, -16], [16, -19, -14], [17, 12, -7], [-1, -6, 12], [-12, -5, -20], [-3, 10, -15], [15, -3, -6], [20, -8, 14], [-2, 14, 7], [-18, -19, 11], [-16, -20, -11], [3, -14, -17], [-6, 16, -1], [1, -2, -8], [14, 12, 4], [-5, 9, 15], [18, -2, -5], [-12, -13, -18], [-12, 15, -19], [-12, 20, -3], [-20, 14, 1], [2, -6, 10], [5, -3, -19], [-14, 5, -6], [4, 15, 14], [-18, 8, 15], [-7, -4, -8], [2, -15, -1], [-12, 11, 18], [10, -5, 15], [-5, 8, -12], [2, 12, 17], [8, 9, -2], [-2, -1, 9], [-1, 7, 15], [-19, -15, -14], [-4, 16, -11], [7, -13, 9], [3, -16, 15], [3, 20, -18], [-4, -18, 7], [-13, 8, -10], [-11, 12, -5], [-14, -3, 6], [-19, 14, -9], [-13, 6, 11], [-10, 16, -20], [-5, -12, -1], [9, -2, 17], [-4, -10, 15], [-13, 18, 19], [-2, 17, -1], [15, -14, 17], [19, 14, 4], [7, -19, -4], [-19, 8, -10], [-12, -5, -18], [-9, 13, -5], [-17, 20, 16], [-6, -8, 12], [-5, 8, -20], [-18, -20, -5], [-2, -12, 18], [-16, 17, 5], [-1, 13, -16], [1, -15, 8], [4, 17, -19], [-15, -8, -19], [-9, 2, 15], [-7, 1, -17], [1, -2, 20], [-9, 11, 3], [-6, 8, -1], [-7, -4, 1], [3, -13, -4], [4, 16, -15], [16, 1, 3], [12, -8, -6], [-16, -19, -4], [3, 18, 10], [-2, -4, 19], [-16, -7, 8], [2, -5, 16], [7, 9, 11], [-8, -20, -16], [-15, -3, 17]], 
+         cube = [-19, -2, -13])
