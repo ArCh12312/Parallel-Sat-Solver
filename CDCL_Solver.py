@@ -11,6 +11,7 @@ class CDCLSolver:
         self.counter = {}
         self.literal_watch = {}
         self.clauses_literal_watched = []
+        self.implications = {}
         self.probability = 0.9
         self.restart_count = 0
         self.imp_count = 0
@@ -19,7 +20,6 @@ class CDCLSolver:
         self.decide_pos = []
         self.back = []
         self.model = []
-        self.solution = None
 
     def read_dimacs_cnf(self, file_path):
         with open(file_path, 'r') as file:
@@ -109,7 +109,10 @@ class CDCLSolver:
     def init_watch_list(self):
         # Initialise the literal watch dictionary
         for literal in self.counter:
-            self.literal_watch[literal] = []
+            if literal not in self.literal_watch:
+                self.literal_watch[literal] = []
+            if -literal not in self.literal_watch:
+                self.literal_watch[-literal] = []
 
         # Populate the watch lists
         for i, clause in enumerate(self.clauses):
@@ -124,6 +127,24 @@ class CDCLSolver:
 
         return
     
+    def init_implication_list(self):
+        for literal in self.counter:
+            if literal not in self.implications:
+                self.implications[literal] = []
+            if -literal not in self.implications:
+                self.implications[-literal] = []
+    
+    def add_implications(self, clause, literal):
+        new_implications = []
+        for lit in clause:
+            if  lit == literal:
+                continue
+            implication = self.implications[lit]
+            if implication == []:
+                new_implications.append(lit)
+            new_implications += implication
+        self.implications[literal] = new_implications
+
     def two_watch_propagate(self, literal):
         # Perform 2-literal watch propagation
         propagation_queue = [literal]
@@ -147,6 +168,7 @@ class CDCLSolver:
                     if unassigned_literals[0] not in self.model:
                         propagation_queue.append(unassigned_literals[0])
                         self.model.append(unassigned_literals[0])
+                        self.add_implications(clause, unassigned_literals[0])
                         continue
                     new_literal = watched_literal_1 if watched_literal_1 != -literal else watched_literal_2
                     unassigned_literals.append(new_literal)
@@ -175,43 +197,62 @@ class CDCLSolver:
             return True
         return False
     
-    def find_decision(self, index):
-        low, high = 0, len(self.decide_pos) - 1
-        result = None
+    # def find_decision(self, index):
+    #     low, high = 0, len(self.decide_pos) - 1
+    #     result = None
         
-        while low <= high:
-            mid = (low + high) // 2
-            if self.decide_pos[mid] == index:
-                return self.decide_pos[mid]  # Target found, return immediately
-            elif self.decide_pos[mid] < index:
-                result = self.decide_pos[mid]  # Update result to the latest lower index
-                low = mid + 1  # Search in the right half
-            else:
-                high = mid - 1  # Search in the left half
+    #     while low <= high:
+    #         mid = (low + high) // 2
+    #         if self.decide_pos[mid] == index:
+    #             return self.decide_pos[mid]  # Target found, return immediately
+    #         elif self.decide_pos[mid] < index:
+    #             result = self.decide_pos[mid]  # Update result to the latest lower index
+    #             low = mid + 1  # Search in the right half
+    #         else:
+    #             high = mid - 1  # Search in the left half
         
-        return result  # Return the last seen lower value as the
+    #     return result  # Return the last seen lower value as the
 
-    def analyze_conflict(self, conflict_clause):
-        # Analyze conflict and generate a learned clause
-        learn_1 = []
-        lowest_index = float('inf')
+    # def analyze_conflict(self, conflict_clause):
+    #     # Analyze conflict and generate a learned clause
+    #     learn_1 = []
+    #     lowest_index = float('inf')
+    #     for literal in conflict_clause:
+    #         index = self.model.index(-literal)
+    #         decision_index = self.find_decision(index)
+    #         if decision_index is None:
+    #             continue
+    #         if decision_index < lowest_index:
+    #             lowest_index = decision_index
+    #         if -self.model[decision_index] not in learn_1:
+    #             learn_1.append(-self.model[decision_index])
+    #     if len(learn_1) == 1 and len(self.decide_pos) != 1:
+    #         learn_1 = [-self.model[pos] for pos in self.decide_pos]
+    #     return learn_1, lowest_index
+    def analyse_conflict(self, conflict_clause):
+        learn = []
+
         for literal in conflict_clause:
-            index = self.model.index(-literal)
-            decision_index = self.find_decision(index)
-            if decision_index < lowest_index:
-                lowest_index = decision_index
-            if -self.model[decision_index] not in learn_1:
-                learn_1.append(-self.model[decision_index])
-        learn_2 = [-self.model[pos] for pos in self.decide_pos]
-        return learn_1, learn_2, lowest_index
+            if self.implications[literal] == []:
+                learn.append(literal)
+            learn += self.implications[literal]
 
-    def backjump(self, decision_level): ### Change this to use dec_level
+        for i in range(len(learn)):
+            learn[i] = -learn[i]
+
+        return learn
+
+    def backjump(self, learned_clause): ### Change this to use dec_level
         self.imp_count += len(self.model) - len(self.decide_pos)
         # Perform backjumping to a decision level
         if not self.decide_pos:
             return -1, -1
         dec_level = self.decide_pos.pop()
         literal = self.model[dec_level]
+        delete = self.model[dec_level+1:]
+        for lit in delete:
+            self.implications[lit] = []
+        self.add_implications(learned_clause, -literal)
         del self.model[dec_level:]
         return 0,-literal
 
@@ -254,6 +295,7 @@ class CDCLSolver:
         self.num_clauses = len(self.clauses)
         self.vsids_init()
         self.init_watch_list()
+        self.init_implication_list()
         while not self.all_vars_assigned():
             literal = self.vsids_decide()
             self.decide_count += 1
@@ -263,10 +305,9 @@ class CDCLSolver:
             while conflict_clause is not None:
                 self.vsids_conflict(conflict_clause)
                 self.vsids_decay()
-                learned_clause_1, learned_clause_2, decision_level = self.analyze_conflict(conflict_clause)
-                self.add_learned_clause(learned_clause_1)
-                self.add_learned_clause(learned_clause_2)
-                status, unit = self.backjump(decision_level) 
+                learned_clause = self.analyse_conflict(conflict_clause)
+                self.add_learned_clause(learned_clause)
+                status, unit = self.backjump(learned_clause) 
             
                 if status == -1:
                     return -1, self.restart_count, self.decide_count, self.imp_count, self.learned_count
@@ -331,6 +372,6 @@ def main(input_file_path):
 # Example usage:
 if __name__ == "__main__":
     # input_file_path = input("Enter input file path: ")
-    input_file_path = "./tests/uf20-91/uf20-099.cnf"
+    input_file_path = "./tests/uf20-91/uf20-0102.cnf"
     # input_file_path = "./tests/uf100-01.cnf"
     main(input_file_path)
