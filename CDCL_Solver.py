@@ -5,6 +5,7 @@ import random
 class CDCLSolver:
     def __init__(self):
         self.clauses = []
+        self.clauses_original = []
         self.num_vars = 0
         self.num_clauses = 0
         self.counter = {}
@@ -32,6 +33,7 @@ class CDCLSolver:
                     clause = [int(x) for x in line.split() if x != '0']
                     if clause:
                         self.clauses.append(clause)
+        self.clauses_original = self.clauses[:]
     
     def find_unit_clause(self):
         for clause in self.clauses:
@@ -127,8 +129,14 @@ class CDCLSolver:
         propagation_queue = [literal]
         while propagation_queue:
             literal = propagation_queue.pop()
+            if -literal not in self.literal_watch:
+                self.literal_watch[-literal] = []
             for clause_index in reversed(self.literal_watch[-literal]):
                 clause = self.clauses[clause_index]
+                if len(clause) == 1:
+                    propagation_queue.append(clause[0])
+                    self.model.append(clause[0])
+                    continue
                 watched_literal_1 = self.clauses_literal_watched[clause_index][0]
                 watched_literal_2 = self.clauses_literal_watched[clause_index][1]
                 # Case that the clause is satisfied
@@ -164,26 +172,50 @@ class CDCLSolver:
                 self.probability = 0.2
             if self.restart_count > len(self.model) + 10:  # Avoid excessive restarts
                 self.probability = 0
-        return
+            return True
+        return False
     
-    def analyze_conflict(self):
-        # Analyze conflict and generate a learned clause
-        learn = []
-        for x in self.decide_pos:
-            learn.append(-self.model[x])
-        return learn
+    def find_decision(self, index):
+        low, high = 0, len(self.decide_pos) - 1
+        result = None
+        
+        while low <= high:
+            mid = (low + high) // 2
+            if self.decide_pos[mid] == index:
+                return self.decide_pos[mid]  # Target found, return immediately
+            elif self.decide_pos[mid] < index:
+                result = self.decide_pos[mid]  # Update result to the latest lower index
+                low = mid + 1  # Search in the right half
+            else:
+                high = mid - 1  # Search in the left half
+        
+        return result  # Return the last seen lower value as the
 
-    def backjump(self): ### Change this to use dec_level
+    def analyze_conflict(self, conflict_clause):
+        # Analyze conflict and generate a learned clause
+        learn_1 = []
+        lowest_index = float('inf')
+        for literal in conflict_clause:
+            index = self.model.index(-literal)
+            decision_index = self.find_decision(index)
+            if decision_index < lowest_index:
+                lowest_index = decision_index
+            if -self.model[decision_index] not in learn_1:
+                learn_1.append(-self.model[decision_index])
+        learn_2 = [-self.model[pos] for pos in self.decide_pos]
+        return learn_1, learn_2, lowest_index
+
+    def backjump(self, decision_level): ### Change this to use dec_level
         self.imp_count += len(self.model) - len(self.decide_pos)
         # Perform backjumping to a decision level
         if not self.decide_pos:
-            return -1,-1
+            return -1, -1
         dec_level = self.decide_pos.pop()
         literal = self.model[dec_level]
         del self.model[dec_level:]
         return 0,-literal
 
-    def all_vars_assigned(self):        # Returns True if all variables already assigne , False otherwise
+    def all_vars_assigned(self):        # Returns True if all variables already assigned , False otherwise
         return len(self.model) >= self.num_vars
     
     def assign(self,literal):             # Adds the decision literal to M and correponding update to decision level
@@ -231,22 +263,28 @@ class CDCLSolver:
             while conflict_clause is not None:
                 self.vsids_conflict(conflict_clause)
                 self.vsids_decay()
-                learned_clause = self.analyze_conflict()
-                self.add_learned_clause(learned_clause)
-                status, unit = self.backjump() 
+                learned_clause_1, learned_clause_2, decision_level = self.analyze_conflict(conflict_clause)
+                self.add_learned_clause(learned_clause_1)
+                self.add_learned_clause(learned_clause_2)
+                status, unit = self.backjump(decision_level) 
             
                 if status == -1:
                     return -1, self.restart_count, self.decide_count, self.imp_count, self.learned_count
                 
                 self.model.append(unit)
-                self.random_restart()
+                # restart = self.random_restart()
+                restart = False
+                if restart:
+                    conflict_clause = None
+                    continue
                 conflict_clause = self.two_watch_propagate(unit)
-        
+
+
         return self.model, self.restart_count, self.decide_count, self.imp_count, self.learned_count
 
     def verify_solution(self, model):
         # Verify the solution
-        for clause in self.clauses :                   # for each clause
+        for clause in self.clauses_original:                   # for each clause
             flag = False
             for literal in clause:
                 if literal in model:                 # atleast one literal should be true
@@ -293,5 +331,6 @@ def main(input_file_path):
 # Example usage:
 if __name__ == "__main__":
     # input_file_path = input("Enter input file path: ")
-    input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
+    input_file_path = "./tests/uf20-91/uf20-099.cnf"
+    # input_file_path = "./tests/uf100-01.cnf"
     main(input_file_path)

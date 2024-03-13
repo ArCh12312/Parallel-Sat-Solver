@@ -7,6 +7,7 @@ class Look_ahead_Solver:
         self.num_vars = 0
         self.num_clauses = 0
         self.branch_count = 0
+        self.weights = [0,0,0]
     
     def read_dimacs_cnf(self, file_path):
         with open(file_path, 'r') as file:
@@ -74,15 +75,34 @@ class Look_ahead_Solver:
         # Return the top 5 literals
         return sorted_literals[:5]
 
-    def compute_score(self, formula, subformula, model, new_model):
-        # Reduction in the number of clauses
-        clause_reduction_ratio = (len(formula) - len(subformula)) / max(len(formula), 1)
+    def compute_score(self, original_formula, new_formula, original_model, new_model):
+        # # Reduction in the number of clauses, prioritizing larger reductions.
+        # clause_reduction = len(original_formula) - len(new_formula)
 
-        # Increase in the model size (i.e., how many literals are decided)
-        model_increase_ratio = (len(new_model) - len(model)) / max(len(model), 1)
+        # # Increase in the model size, prioritizing larger increases.
+        # model_increase = len(new_model) - len(original_model)
 
-        # Prioritize reducing the formula size and increasing the model size
-        score = clause_reduction_ratio * 2 + model_increase_ratio
+        # # Consider the complexity reduction, focusing on clauses' length shortening.
+        # original_complexity = sum(len(clause) for clause in original_formula)
+        # new_complexity = sum(len(clause) for clause in new_formula)
+        # complexity_reduction = original_complexity - new_complexity
+
+        # # The score combines these factors with appropriate weights.
+        # score = (clause_reduction * self.weights[0]) + (model_increase * self.weights[1]) + (complexity_reduction*self.weights[2])
+        
+                # Original components
+        clause_reduction = len(original_formula) - len(new_formula)
+        model_increase = len(new_model) - len(original_model)
+
+        # New JW-like scoring for clause complexity reduction
+        jw_score_original = sum(2**-len(clause) for clause in original_formula)
+        jw_score_new = sum(2**-len(clause) for clause in new_formula)
+        jw_complexity_reduction = jw_score_original - jw_score_new
+
+        # Combine scores with adjusted weights
+        score = (clause_reduction * self.weights[0]) + (model_increase * self.weights[1]) + (jw_complexity_reduction * self.weights[2])
+        
+        # score = 1
 
         return score
 
@@ -164,11 +184,12 @@ class Look_ahead_Solver:
                 return False
         return True
 
-    def solve(self, input_file_path):
+    def solve(self, input_file_path, weights = [1,1,4]):
         start = time.time()
         self.read_dimacs_cnf(input_file_path)
         end = time.time()
         read_time = end - start
+        self.weights = weights
         start = time.time()
         sat, model = self.look_ahead_dpll(self.clauses)
         end = time.time()
@@ -181,8 +202,8 @@ class Look_ahead_Solver:
 
 def main():
     # input_file_path = "./tests/uf20-91/uf20-01.cnf"
-    # input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
-    input_file_path = "./tests/uf100-01.cnf"
+    input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
+    # input_file_path = "./tests/uf100-01.cnf"
     # input_file_path = input("Enter input file path: ")
     solver = Look_ahead_Solver()
     sat, model, verification_result, branch_count, read_time, solve_time = solver.solve(input_file_path)
