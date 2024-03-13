@@ -5,7 +5,6 @@ import random
 class CDCLSolver:
     def __init__(self):
         self.clauses = []
-        self.clauses_original = []
         self.num_vars = 0
         self.num_clauses = 0
         self.counter = {}
@@ -139,9 +138,9 @@ class CDCLSolver:
         for lit in clause:
             if  lit == literal:
                 continue
-            implication = self.implications[lit]
+            implication = self.implications[-lit]
             if implication == []:
-                new_implications.append(lit)
+                new_implications.append(-lit)
             new_implications += implication
         self.implications[literal] = new_implications
 
@@ -201,14 +200,14 @@ class CDCLSolver:
         learn = []
 
         for literal in conflict_clause:
-            if self.implications[literal] == []:
-                learn.append(literal)
-            learn += self.implications[literal]
+            if self.implications[-literal] == []:
+                learn.append(-literal)
+            learn += self.implications[-literal]
 
         for i in range(len(learn)):
             learn[i] = -learn[i]
 
-        return learn
+        return list(set(learn))
 
     def backjump(self, learned_clause): ### Change this to use dec_level
         self.imp_count += len(self.model) - len(self.decide_pos)
@@ -251,7 +250,11 @@ class CDCLSolver:
 
     def solve(self, input_file_path):
         # Solve the CNF formula using CDCL algorithm
+        start = time.time()
         self.read_dimacs_cnf(input_file_path)
+        end = time.time()
+        read_time = end- start
+        start = time.time()
         self.unit_propagate()
         self.pure_literal_elimination()
         if self.clauses == []:
@@ -287,19 +290,34 @@ class CDCLSolver:
                     continue
                 conflict_clause = self.two_watch_propagate(unit)
 
+        end = time.time()
+        solve_time = end - start
+        verification_result = self.verify_solution()
+        return self.model, self.restart_count, self.decide_count, self.imp_count, self.learned_count, verification_result, read_time, solve_time
 
-        return self.model, self.restart_count, self.decide_count, self.imp_count, self.learned_count
+    def check_model_consistency(self):
+        variables = set()
+        for literal in self.model:
+            variable = abs(literal)
+            if variable in variables:
+                print("Inconsistent")
+                return False  # Inconsistent model
+            variables.add(variable)
+        return True
 
-    def verify_solution(self, model):
+    def verify_solution(self):
         # Verify the solution
-        for clause in self.clauses_original:                   # for each clause
+        next = self.check_model_consistency()
+        if not next:
+            return False
+        for clause in self.clauses:                   # for each clause
             flag = False
             for literal in clause:
-                if literal in model:                 # atleast one literal should be true
+                if literal in self.model:                 # atleast one literal should be true
                     flag = True
                     break
             if not flag:
-                print(clause)
+                print(f"Unsatisfied clause: {clause}")
                 return False
         return True
 
@@ -307,23 +325,17 @@ def write_solution_to_file(self, filename):
     # Write the solution to a file
     pass
 
-def print_statistics(self):
-    # Print statistics about solving process
-    pass
-
 def main(input_file_path):
     # Main method to read CNF, solve, and print results
     solver = CDCLSolver()
-    start_time = time.time()
-    model, restart_count, decide_count, imp_count, learned_count = solver.solve(input_file_path)
-    end_time = time.time()
+    model, restart_count, decide_count, imp_count, learned_count, verification_result, read_time, solve_time = solver.solve(input_file_path)
 
     if model == -1:
         print("No solution found.")
     else:
         print("Solution found:", model)
         # solver.write_solution_to_file("solution.cnf")
-        print("Assignment verification result:", solver.verify_solution(model))
+        print("Assignment verification result:", verification_result)
     print()
     print("Statistics :")
     print("=============================================")
@@ -334,11 +346,12 @@ def main(input_file_path):
     print("=============================================")
     
     # solver.print_statistics()
-    print("Time taken:", end_time - start_time, "seconds")
+    print("Time taken:", solve_time, "seconds")
 
 # Example usage:
 if __name__ == "__main__":
     # input_file_path = input("Enter input file path: ")
-    input_file_path = "./tests/uf20-91/uf20-099.cnf"
+    input_file_path = "./tests/uf20-91/uf20-0102.cnf"
     # input_file_path = "./tests/uf100-01.cnf"
+    # input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
     main(input_file_path)
