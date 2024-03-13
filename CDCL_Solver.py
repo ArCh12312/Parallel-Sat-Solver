@@ -197,38 +197,6 @@ class CDCLSolver:
             return True
         return False
     
-    # def find_decision(self, index):
-    #     low, high = 0, len(self.decide_pos) - 1
-    #     result = None
-        
-    #     while low <= high:
-    #         mid = (low + high) // 2
-    #         if self.decide_pos[mid] == index:
-    #             return self.decide_pos[mid]  # Target found, return immediately
-    #         elif self.decide_pos[mid] < index:
-    #             result = self.decide_pos[mid]  # Update result to the latest lower index
-    #             low = mid + 1  # Search in the right half
-    #         else:
-    #             high = mid - 1  # Search in the left half
-        
-    #     return result  # Return the last seen lower value as the
-
-    # def analyze_conflict(self, conflict_clause):
-    #     # Analyze conflict and generate a learned clause
-    #     learn_1 = []
-    #     lowest_index = float('inf')
-    #     for literal in conflict_clause:
-    #         index = self.model.index(-literal)
-    #         decision_index = self.find_decision(index)
-    #         if decision_index is None:
-    #             continue
-    #         if decision_index < lowest_index:
-    #             lowest_index = decision_index
-    #         if -self.model[decision_index] not in learn_1:
-    #             learn_1.append(-self.model[decision_index])
-    #     if len(learn_1) == 1 and len(self.decide_pos) != 1:
-    #         learn_1 = [-self.model[pos] for pos in self.decide_pos]
-    #     return learn_1, lowest_index
     def analyse_conflict(self, conflict_clause):
         learn = []
 
@@ -313,8 +281,7 @@ class CDCLSolver:
                     return -1, self.restart_count, self.decide_count, self.imp_count, self.learned_count
                 
                 self.model.append(unit)
-                # restart = self.random_restart()
-                restart = False
+                restart = self.random_restart()
                 if restart:
                     conflict_clause = None
                     continue
@@ -372,6 +339,6 @@ def main(input_file_path):
 # Example usage:
 if __name__ == "__main__":
     # input_file_path = input("Enter input file path: ")
-    input_file_path = "./tests/uf20-91/uf20-0102.cnf"
+    input_file_path = "./tests/uf20-91/uf20-099.cnf"
     # input_file_path = "./tests/uf100-01.cnf"
     main(input_file_path)
