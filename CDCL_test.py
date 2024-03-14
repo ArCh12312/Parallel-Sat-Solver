@@ -234,17 +234,16 @@ class CDCLSolver:
         intersection_set = set(self.implications[conflict_clause[0]])
         for literal in conflict_clause:
             intersection_set.intersection_update(self.implications[literal])
+            if len(intersection_set) == 0:
+                break
         
         intersection_set = list(intersection_set)
         if  len(intersection_set) != 0:
             decision_level, _ = self.find_decision_level(intersection_set)
             decision_level_literal = -self.model[decision_level]
         else:
-            if len(learn) > 2:
+            if len(learn) > 1:
                 _, decision_level = self.find_decision_level(learn)
-                decision_level_literal = -self.model[decision_level]
-            elif len(learn) > 1:
-                decision_level, _ = self.find_decision_level(learn)
                 decision_level_literal = -self.model[decision_level]
             else:
                 decision_level = self.model.index(-learn[0])
@@ -262,18 +261,18 @@ class CDCLSolver:
         if not self.decide_pos:
             return -1, -1
         index = self.decide_pos.index(decision_level)
-        self.decide_pos = self.decide_pos[:index]
+        self.decide_pos = self.decide_pos[:index+1]
         literal = self.model[decision_level]
-        del self.model[decision_level:]
-        self.model.append(-literal)
-        self.add_implications(learned_clause, -literal)
+        del self.model[decision_level+1:]
+        # self.model.append(-literal)
+        # self.add_implications(learned_clause, -literal)
         for lit in self.implications:
             if lit not in self.model:
                 self.implications[lit] = []
-        return 0,-literal
+        return 0,literal
 
     def all_vars_assigned(self):        # Returns True if all variables already assigned , False otherwise
-        return len(self.model) >= self.num_vars
+        return len(set(self.model)) >= self.num_vars
     
     def assign(self,literal):             # Adds the decision literal to M and correponding update to decision level
         self.decide_pos.append(len(self.model))
@@ -287,12 +286,12 @@ class CDCLSolver:
         if len(learned_clause) == 1:
             self.model.append(learned_clause[0])
             self.clauses_literal_watched.append([learned_clause[0]])
-            self.literal_watch[learned_clause[0]].append(self.num_clauses)
+            self.literal_watch[learned_clause[0]].append(len(self.clauses))
             self.clauses.append(learned_clause)
             return
         self.clauses_literal_watched.append([learned_clause[0],learned_clause[1]])
-        self.literal_watch[learned_clause[0]].append(self.num_clauses)
-        self.literal_watch[learned_clause[1]].append(self.num_clauses)
+        self.literal_watch[learned_clause[0]].append(len(self.clauses))
+        self.literal_watch[learned_clause[1]].append(len(self.clauses))
         self.clauses.append(learned_clause)
         return 
 
@@ -331,7 +330,8 @@ class CDCLSolver:
                 status, unit = self.backjump(decision_level, learned_clause) 
             
                 if status == -1:
-                    break
+                    solve_time = time.time() - start
+                    return -1, self.restart_count, self.decide_count, self.imp_count, self.learned_count, None, read_time, solve_time
                 
                 # self.model.append(unit)
                 # restart = self.random_restart()
@@ -433,7 +433,7 @@ def main(input_file_path):
 
 if __name__ == "__main__":
     # input_file_path = input("Enter input file path: ")
-    # input_file_path = "./tests/uf20-91/uf20-0102.cnf"
-    input_file_path = "./tests/uf100-01.cnf"
-    # input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
+    # input_file_path = "./tests/uf20-91/uf20-099.cnf"
+    # input_file_path = "./tests/uf100-01.cnf"
+    input_file_path = "./tests/UF250.1065.100/uf250-02.cnf"
     main(input_file_path)
