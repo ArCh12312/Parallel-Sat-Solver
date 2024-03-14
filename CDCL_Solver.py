@@ -321,37 +321,68 @@ class CDCLSolver:
                 return False
         return True
 
-def write_solution_to_file(self, filename):
+def write_solution_to_file(file_path, outputs):
     # Write the solution to a file
-    pass
+    with open(file_path, "w") as file:
+        if outputs['model'] == -1:
+            file.write("Satisfiable: False\n")
+            file.write("No solution found.\n")
+            file.write("Assignment verification result: None\n")
+        else:
+            file.write("Satisfiable: True\n")
+            file.write(f"Model: {outputs['model']}\n")
+            file.write(f"Assignment verification result: {outputs['verification_result']}\n")
+        
+        file.write("\nStatistics:\n")
+        file.write("=============================================\n")
+        file.write(f"# Restarts: {outputs['restart_count']}\n")
+        file.write(f"# Learned Clauses: {outputs['learned_count']}\n")
+        file.write(f"# Decisions: {outputs['decide_count']}\n")
+        file.write(f"# Implications: {outputs['imp_count']}\n")
+        file.write("=============================================\n")
+        file.write(f"Read time: {outputs['read_time']} seconds\n")
+        file.write(f"Solve time: {outputs['solve_time']} seconds\n")
 
 def main(input_file_path):
-    # Main method to read CNF, solve, and print results
     solver = CDCLSolver()
     model, restart_count, decide_count, imp_count, learned_count, verification_result, read_time, solve_time = solver.solve(input_file_path)
 
-    if model == -1:
-        print("No solution found.")
-    else:
-        print("Solution found:", model)
-        # solver.write_solution_to_file("solution.cnf")
-        print("Assignment verification result:", verification_result)
-    print()
-    print("Statistics :")
-    print("=============================================")
-    print(f"# Restarts : {restart_count}")
-    print(f"# Learned Clauses : {learned_count}")
-    print(f"# Decisions : {decide_count}")
-    print(f"# Implications : {imp_count}")
-    print("=============================================")
-    
-    # solver.print_statistics()
-    print("Time taken:", solve_time, "seconds")
+    outputs = {
+        'model': model,
+        'restart_count': restart_count,
+        'decide_count': decide_count,
+        'imp_count': imp_count,
+        'learned_count': learned_count,
+        'verification_result': verification_result,
+        'read_time': read_time,
+        'solve_time': solve_time,
+    }
 
-# Example usage:
+    if model == -1:
+        print("Satisfiable: False")
+        print("Assignment verification result: None")
+    else:
+        print("Satisfiable: True")
+        print(f"Model: {model}")
+        print("Assignment verification result:", verification_result)
+
+    output_file_path = input_file_path.replace('.cnf', '_solution.txt')
+    write_solution_to_file(output_file_path, outputs)  # Call the function with the outputs dictionary
+    print(f"Solution and statistics written to: {output_file_path}")
+
+    print("\nStatistics:")
+    print("=============================================")
+    print(f"# Restarts: {restart_count}")
+    print(f"# Learned Clauses: {learned_count}")
+    print(f"# Decisions: {decide_count}")
+    print(f"# Implications: {imp_count}")
+    print("=============================================")
+    print(f"Read time: {read_time} seconds")
+    print(f"Solve time: {solve_time} seconds")
+
 if __name__ == "__main__":
     # input_file_path = input("Enter input file path: ")
     input_file_path = "./tests/uf20-91/uf20-0102.cnf"
     # input_file_path = "./tests/uf100-01.cnf"
-    # input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
+    # input_file_path = "./tests/UF250.1065.100/uf250-099.cnf"
     main(input_file_path)
