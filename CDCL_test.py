@@ -331,7 +331,7 @@ class CDCLSolver:
             
                 if status == -1:
                     solve_time = time.time() - start
-                    return -1, self.restart_count, self.decide_count, self.imp_count, self.learned_count, None, read_time, solve_time
+                    return [], self.restart_count, self.decide_count, self.imp_count, self.learned_count, None, read_time, solve_time
                 
                 # self.model.append(unit)
                 # restart = self.random_restart()
@@ -375,7 +375,7 @@ class CDCLSolver:
 def write_solution_to_file(file_path, outputs):
     # Write the solution to a file
     with open(file_path, "w") as file:
-        if outputs['model'] == -1:
+        if outputs['model'] == []:
             file.write("Satisfiable: False\n")
             file.write("No solution found.\n")
             file.write("Assignment verification result: None\n")
