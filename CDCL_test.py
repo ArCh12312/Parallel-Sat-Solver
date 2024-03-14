@@ -138,11 +138,13 @@ class CDCLSolver:
         for lit in clause:
             if  lit == literal:
                 continue
+            if -lit not in self.model:
+                continue
             implication = self.implications[-lit]
             if implication == []:
                 new_implications.append(-lit)
             new_implications += implication
-        self.implications[literal] = new_implications
+        self.implications[literal] = list(set(new_implications))
 
     def two_watch_propagate(self, literal):
         # Perform 2-literal watch propagation
@@ -193,8 +195,28 @@ class CDCLSolver:
                 self.probability = 0.2
             if self.restart_count > len(self.model) + 10:  # Avoid excessive restarts
                 self.probability = 0
+            for literal in self.implications:
+                self.implications[literal] = []
             return True
         return False
+    
+    def find_decision_level(self, learn):
+        highest = -1  # Initialize to -1, assuming no decision level can be negative.
+        second_highest = -1  # Initialize to -1 for the same reason.
+
+        for literal in learn:
+            index = self.model.index(-literal)  # Try to find the index (decision level) of -literal.
+
+            # If the current index is higher than the highest recorded, update both highest and second highest.
+            if index > highest:
+                second_highest = highest  # Update second highest to the old highest.
+                highest = index  # Update highest to the current index.
+            # If the current index is not higher than the highest but is higher than the second highest, update second highest.
+            elif index > second_highest:
+                second_highest = index
+
+        return highest, second_highest
+
     
     def analyse_conflict(self, conflict_clause):
         learn = []
@@ -203,24 +225,51 @@ class CDCLSolver:
             if self.implications[-literal] == []:
                 learn.append(-literal)
             learn += self.implications[-literal]
+        
+        learn = list(set(learn))
 
         for i in range(len(learn)):
             learn[i] = -learn[i]
 
-        return list(set(learn))
+        intersection_set = set(self.implications[conflict_clause[0]])
+        for literal in conflict_clause:
+            intersection_set.intersection_update(self.implications[literal])
+        
+        intersection_set = list(intersection_set)
+        if  len(intersection_set) != 0:
+            decision_level, _ = self.find_decision_level(intersection_set)
+            decision_level_literal = -self.model[decision_level]
+        else:
+            if len(learn) > 2:
+                _, decision_level = self.find_decision_level(learn)
+                decision_level_literal = -self.model[decision_level]
+            elif len(learn) > 1:
+                decision_level, _ = self.find_decision_level(learn)
+                decision_level_literal = -self.model[decision_level]
+            else:
+                decision_level = self.model.index(-learn[0])
+                decision_level_literal = -learn[0]
 
-    def backjump(self, learned_clause): 
+        # Bring the decision level literal to the front of the learn list
+        if decision_level_literal in learn:
+            learn.insert(0, learn.pop(learn.index(decision_level_literal)))
+
+        return learn, decision_level
+
+    def backjump(self, decision_level, learned_clause): 
         self.imp_count += len(self.model) - len(self.decide_pos)
         # Perform backjumping to a decision level
         if not self.decide_pos:
             return -1, -1
-        dec_level = self.decide_pos.pop()
-        literal = self.model[dec_level]
-        delete = self.model[dec_level+1:]
-        for lit in delete:
-            self.implications[lit] = []
+        index = self.decide_pos.index(decision_level)
+        self.decide_pos = self.decide_pos[:index]
+        literal = self.model[decision_level]
+        del self.model[decision_level:]
+        self.model.append(-literal)
         self.add_implications(learned_clause, -literal)
-        del self.model[dec_level:]
+        for lit in self.implications:
+            if lit not in self.model:
+                self.implications[lit] = []
         return 0,-literal
 
     def all_vars_assigned(self):        # Returns True if all variables already assigned , False otherwise
@@ -274,17 +323,19 @@ class CDCLSolver:
             conflict_clause = self.two_watch_propagate(literal)
 
             while conflict_clause is not None:
+
                 self.vsids_conflict(conflict_clause)
                 self.vsids_decay()
-                learned_clause = self.analyse_conflict(conflict_clause)
+                learned_clause, decision_level = self.analyse_conflict(conflict_clause)
                 self.add_learned_clause(learned_clause)
-                status, unit = self.backjump(learned_clause) 
+                status, unit = self.backjump(decision_level, learned_clause) 
             
                 if status == -1:
-                    return -1, self.restart_count, self.decide_count, self.imp_count, self.learned_count
+                    break
                 
-                self.model.append(unit)
-                restart = self.random_restart()
+                # self.model.append(unit)
+                # restart = self.random_restart()
+                restart = False
                 if restart:
                     conflict_clause = None
                     continue
@@ -384,5 +435,5 @@ if __name__ == "__main__":
     # input_file_path = input("Enter input file path: ")
     # input_file_path = "./tests/uf20-91/uf20-0102.cnf"
     input_file_path = "./tests/uf100-01.cnf"
-    # input_file_path = "./tests/UF250.1065.100/uf250-099.cnf"
+    # input_file_path = "./tests/UF250.1065.100/uf250-01.cnf"
     main(input_file_path)
